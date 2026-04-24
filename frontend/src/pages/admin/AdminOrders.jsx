@@ -1,0 +1,229 @@
+import { useState, useEffect } from 'react';
+import { adminAPI } from '../../services/api';
+import { useNotification } from '../../context/NotificationContext';
+
+const AdminOrders = () => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const { showNotification } = useNotification();
+
+  useEffect(() => {
+    fetchOrders();
+  }, [page, filter]);
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    try {
+      const params = { page, limit: 20 };
+      if (filter !== 'all') params.status = filter;
+      
+      const response = await adminAPI.getAllOrders(params);
+      setOrders(response.data.orders);
+      setTotalPages(response.data.totalPages || 1);
+    } catch (error) {
+      showNotification('Failed to fetch orders', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    const colors = {
+      pending: 'badge-warning',
+      confirmed: 'badge-info',
+      processing: 'badge-info',
+      shipped: 'badge-primary',
+      delivered: 'badge-success',
+      cancelled: 'badge-danger',
+    };
+    return `badge ${colors[status] || 'badge-secondary'}`;
+  };
+
+  const totalRevenue = orders
+    .filter((o) => o.paymentStatus === 'paid')
+    .reduce((sum, o) => sum + o.totalAmount, 0);
+
+  return (
+    <div className="admin-orders-page">
+      <div className="page-header">
+        <h1>Orders Management</h1>
+        <div className="header-stats">
+          <div className="stat">
+            <span>Total Revenue</span>
+            <strong>Rs. {totalRevenue.toFixed(2)}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div className="filter-tabs">
+        {['all', 'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'].map((status) => (
+          <button
+            key={status}
+            className={`filter-tab ${filter === status ? 'active' : ''}`}
+            onClick={() => {
+              setFilter(status);
+              setPage(1);
+            }}
+          >
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="loading-container">
+          <div className="spinner"></div>
+        </div>
+      ) : (
+        <div className="orders-container">
+          <div className="orders-table-container">
+            <table className="orders-table">
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Customer</th>
+                  <th>Pharmacy</th>
+                  <th>Items</th>
+                  <th>Total</th>
+                  <th>Payment</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => (
+                  <tr key={order._id}>
+                    <td>#{order._id.slice(-8).toUpperCase()}</td>
+                    <td>{order.customer?.name}</td>
+                    <td>{order.pharmacy?.name}</td>
+                    <td>{order.items?.length} items</td>
+                    <td>Rs. {order.totalAmount.toFixed(2)}</td>
+                    <td>
+                      <span className={`badge ${order.paymentStatus === 'paid' ? 'badge-success' : 'badge-warning'}`}>
+                        {order.paymentStatus}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={getStatusBadge(order.status)}>{order.status}</span>
+                    </td>
+                    <td>{new Date(order.createdAt).toLocaleDateString()}</td>
+                    <td>
+                      <button
+                        onClick={() => setSelectedOrder(order)}
+                        className="btn btn-outline btn-sm"
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="pagination">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="btn btn-outline"
+              >
+                Previous
+              </button>
+              <span>
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="btn btn-outline"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Order Details Modal */}
+      {selectedOrder && (
+        <div className="modal-overlay">
+          <div className="modal modal-large">
+            <div className="modal-header">
+              <h2>Order #{selectedOrder._id.slice(-8).toUpperCase()}</h2>
+              <button onClick={() => setSelectedOrder(null)} className="close-btn">
+                &times;
+              </button>
+            </div>
+            <div className="modal-content">
+              <div className="order-detail-grid">
+                <section>
+                  <h3>Customer Information</h3>
+                  <p><strong>Name:</strong> {selectedOrder.customer?.name}</p>
+                  <p><strong>Email:</strong> {selectedOrder.customer?.email}</p>
+                  <p><strong>Phone:</strong> {selectedOrder.customer?.phone}</p>
+                </section>
+
+                <section>
+                  <h3>Pharmacy Information</h3>
+                  <p><strong>Name:</strong> {selectedOrder.pharmacy?.name}</p>
+                  <p><strong>Phone:</strong> {selectedOrder.pharmacy?.phone}</p>
+                  <p><strong>Location:</strong> {selectedOrder.pharmacy?.address?.city}</p>
+                </section>
+
+                <section>
+                  <h3>Delivery Address</h3>
+                  <p>{selectedOrder.deliveryAddress?.street}</p>
+                  <p>{selectedOrder.deliveryAddress?.city}, {selectedOrder.deliveryAddress?.state}</p>
+                  <p>PIN: {selectedOrder.deliveryAddress?.pincode}</p>
+                </section>
+
+                <section>
+                  <h3>Payment Details</h3>
+                  <p><strong>Method:</strong> {selectedOrder.paymentMethod === 'cod' ? 'Cash on Delivery' : 'Online'}</p>
+                  <p>
+                    <strong>Status:</strong>{' '}
+                    <span className={`badge ${selectedOrder.paymentStatus === 'paid' ? 'badge-success' : 'badge-warning'}`}>
+                      {selectedOrder.paymentStatus}
+                    </span>
+                  </p>
+                  <p><strong>Total:</strong> Rs. {selectedOrder.totalAmount.toFixed(2)}</p>
+                </section>
+              </div>
+
+              <section>
+                <h3>Order Items</h3>
+                <div className="order-items-list">
+                  {selectedOrder.items?.map((item, index) => (
+                    <div key={index} className="order-item">
+                      <span className="item-name">{item.medicine?.name}</span>
+                      <span className="item-qty">x{item.quantity}</span>
+                      <span className="item-price">Rs. {(item.price * item.quantity).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <h3>Order Timeline</h3>
+                <p><strong>Created:</strong> {new Date(selectedOrder.createdAt).toLocaleString()}</p>
+                <p><strong>Last Updated:</strong> {new Date(selectedOrder.updatedAt).toLocaleString()}</p>
+                <p>
+                  <strong>Current Status:</strong>{' '}
+                  <span className={getStatusBadge(selectedOrder.status)}>{selectedOrder.status}</span>
+                </p>
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AdminOrders;
