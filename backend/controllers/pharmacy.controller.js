@@ -4,33 +4,25 @@ import Stock from '../models/Stock.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
 
 // Get all pharmacies
+// GET /api/pharmacies
 export const getAllPharmacies = asyncHandler(async (req, res) => {
-  const { 
-    page = 1, 
-    limit = 10, 
-    city, 
-    isVerified, 
+  const {
+    page = 1,
+    limit = 10,
+    city,
+    isVerified,
     is24Hours,
     lat,
     lng,
-    radius = 10,
+    radius = 10,  // km
     search
   } = req.query;
 
   const query = { isActive: true };
 
-  if (city) {
-    query['address.city'] = { $regex: city, $options: 'i' };
-  }
-
-  if (isVerified !== undefined) {
-    query.isVerified = isVerified === 'true';
-  }
-
-  if (is24Hours !== undefined) {
-    query['operatingHours.is24Hours'] = is24Hours === 'true';
-  }
-
+  if (city) query['address.city'] = { $regex: city, $options: 'i' };
+  if (isVerified !== undefined) query.isVerified = isVerified === 'true';
+  if (is24Hours !== undefined) query['operatingHours.is24Hours'] = is24Hours === 'true';
   if (search) {
     query.$or = [
       { name: { $regex: search, $options: 'i' } },
@@ -38,47 +30,74 @@ export const getAllPharmacies = asyncHandler(async (req, res) => {
     ];
   }
 
-  let pharmacies = await Pharmacy.find(query)
-    .populate('owner', 'name email phone')
-    .limit(limit * 1)
-    .skip((page - 1) * limit)
-    .sort({ rating: -1 });
+  let pharmacies;
+  let total;
 
-  // If coordinates provided, calculate distances
   if (lat && lng) {
-    const userLat = parseFloat(lat);
+    // FIXED: Use MongoDB $nearSphere — uses the 2dsphere index, returns pre-sorted by distance
+    // IMPORTANT: MongoDB GeoJSON uses [longitude, latitude] order
     const userLng = parseFloat(lng);
-    
+    const userLat = parseFloat(lat);
+    const maxDistanceMeters = parseFloat(radius) * 1000; // convert km to meters
+
+    // $nearSphere automatically sorts by distance ascending
+    const geoQuery = {
+      ...query,
+      'address.location': {
+        $nearSphere: {
+          $geometry: {
+            type: 'Point',
+            coordinates: [userLng, userLat]  // [lng, lat] — MongoDB order!
+          },
+          $maxDistance: maxDistanceMeters
+        }
+      }
+    };
+
+    // $nearSphere does not support .count() directly, so we run both
+    [pharmacies, total] = await Promise.all([
+      Pharmacy.find(geoQuery)
+        .populate('owner', 'name email phone')
+        .skip((page - 1) * parseInt(limit))
+        .limit(parseInt(limit)),
+      Pharmacy.countDocuments(geoQuery)
+    ]);
+
+    // Calculate and attach distance for display (MongoDB doesn't return it with find())
     pharmacies = pharmacies.map(pharmacy => {
-      const pharmacyLat = pharmacy.address.coordinates.lat;
+      const p = pharmacy.toObject();
       const pharmacyLng = pharmacy.address.coordinates.lng;
-      
-      // Haversine formula
+      const pharmacyLat = pharmacy.address.coordinates.lat;
+
+      // Haversine for display only — query already filtered by distance
       const R = 6371;
       const dLat = (pharmacyLat - userLat) * Math.PI / 180;
       const dLng = (pharmacyLng - userLng) * Math.PI / 180;
-      const a = 
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      const a =
+        Math.sin(dLat / 2) ** 2 +
         Math.cos(userLat * Math.PI / 180) * Math.cos(pharmacyLat * Math.PI / 180) *
-        Math.sin(dLng / 2) * Math.sin(dLng / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const distance = R * c;
+        Math.sin(dLng / 2) ** 2;
+      p.distance = Math.round(2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * R * 10) / 10;
+      return p;
+    });
 
-      return {
-        ...pharmacy.toObject(),
-        distance: Math.round(distance * 10) / 10
-      };
-    }).filter(p => p.distance <= radius)
-      .sort((a, b) => a.distance - b.distance);
+  } else {
+    // No location filter — standard query sorted by rating
+    [pharmacies, total] = await Promise.all([
+      Pharmacy.find(query)
+        .populate('owner', 'name email phone')
+        .skip((page - 1) * parseInt(limit))
+        .limit(parseInt(limit))
+        .sort({ rating: -1 }),
+      Pharmacy.countDocuments(query)
+    ]);
   }
-
-  const total = await Pharmacy.countDocuments(query);
 
   sendSuccess(res, 200, {
     pharmacies,
     pagination: {
       current: parseInt(page),
-      pages: Math.ceil(total / limit),
+      pages: Math.ceil(total / parseInt(limit)),
       total
     }
   }, 'Pharmacies fetched successfully');
@@ -97,56 +116,59 @@ export const getPharmacyById = asyncHandler(async (req, res) => {
 });
 
 // Get pharmacy stock
+// GET /api/pharmacies/:id/stock
 export const getPharmacyStock = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, search, category, inStock } = req.query;
 
   const pharmacy = await Pharmacy.findById(req.params.id);
-  
-  if (!pharmacy) {
-    return sendError(res, 404, 'Pharmacy not found');
-  }
+  if (!pharmacy) return sendError(res, 404, 'Pharmacy not found');
 
-  const stockQuery = { pharmacy: req.params.id };
+  // FIXED: Filter before paginating using aggregation
+  const pipeline = [
+    { $match: { pharmacy: pharmacy._id } },
+    {
+      $lookup: {
+        from: 'medicines',
+        localField: 'medicine',
+        foreignField: '_id',
+        as: 'medicine'
+      }
+    },
+    { $unwind: '$medicine' },
 
-  if (inStock !== undefined) {
-    if (inStock === 'true') {
-      stockQuery.quantity = { $gt: 0 };
-      stockQuery.isAvailable = true;
+    // Apply filters before pagination
+    ...(inStock === 'true' ? [{ $match: { quantity: { $gt: 0 }, isAvailable: true } }] : []),
+    ...(search ? [{
+      $match: {
+        $or: [
+          { 'medicine.name': { $regex: search, $options: 'i' } },
+          { 'medicine.genericName': { $regex: search, $options: 'i' } }
+        ]
+      }
+    }] : []),
+    ...(category ? [{ $match: { 'medicine.category': category } }] : []),
+
+    { $sort: { lastUpdated: -1 } },
+    {
+      $facet: {
+        stock: [
+          { $skip: (parseInt(page) - 1) * parseInt(limit) },
+          { $limit: parseInt(limit) }
+        ],
+        totalCount: [{ $count: 'count' }]
+      }
     }
-  }
+  ];
 
-  let stock = await Stock.find(stockQuery)
-    .populate('medicine')
-    .limit(limit * 1)
-    .skip((page - 1) * limit)
-    .sort({ lastUpdated: -1 });
-
-  // Filter by medicine search/category after population
-  if (search || category) {
-    stock = stock.filter(item => {
-      let match = true;
-      if (search) {
-        const searchLower = search.toLowerCase();
-        match = match && (
-          item.medicine.name.toLowerCase().includes(searchLower) ||
-          (item.medicine.genericName && item.medicine.genericName.toLowerCase().includes(searchLower))
-        );
-      }
-      if (category) {
-        match = match && item.medicine.category === category;
-      }
-      return match;
-    });
-  }
-
-  const total = await Stock.countDocuments(stockQuery);
+  const [result] = await Stock.aggregate(pipeline);
+  const total = result.totalCount[0]?.count || 0;
 
   sendSuccess(res, 200, {
     pharmacy,
-    stock,
+    stock: result.stock,
     pagination: {
       current: parseInt(page),
-      pages: Math.ceil(total / limit),
+      pages: Math.ceil(total / parseInt(limit)),
       total
     }
   }, 'Pharmacy stock fetched successfully');

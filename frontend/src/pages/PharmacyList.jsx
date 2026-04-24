@@ -76,7 +76,7 @@ const PharmacyList = () => {
 
   useEffect(() => {
     fetchPharmacies();
-  }, [filters, userLocation]);
+  }, [filters.search, filters.city, filters.is24Hours, filters.page, userLocation?.lat, userLocation?.lng]);
 
   const fetchPharmacies = async () => {
     setLoading(true);

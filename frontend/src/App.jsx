@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { useState, useEffect } from 'react';
 
 // Layouts
 import MainLayout from './layouts/MainLayout';
@@ -30,6 +31,7 @@ import PharmacyDashboard from './pages/pharmacy/PharmacyDashboard';
 import ManageStock from './pages/pharmacy/PharmacyStock';
 import PharmacyOrders from './pages/pharmacy/PharmacyOrders';
 import PharmacyProfile from './pages/pharmacy/PharmacyProfile';
+import PharmacyAnalytics from './pages/pharmacy/PharmacyAnalytics';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -43,6 +45,14 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   const { user, loading } = useAuth();
+  const [renderKey, setRenderKey] = useState(0);
+
+  console.log('🚀 App render:', { user, loading, userRole: user?.role, renderKey });
+
+  // Force re-render when user changes
+  useEffect(() => {
+    setRenderKey(prev => prev + 1);
+  }, [user]);
 
   if (loading) {
     return (
@@ -54,10 +64,30 @@ function App() {
   }
 
   return (
-    <Routes>
+    <Routes key={renderKey}>
       {/* Public Routes */}
       <Route element={<MainLayout />}>
-        <Route path="/" element={<Home />} />
+        <Route
+          path="/"
+          element={
+            user && !loading ? (
+              user.role === 'admin' ? (
+                <Navigate to="/admin/dashboard" replace />
+              ) : user.role === 'pharmacy' ? (
+                <Navigate to="/pharmacy/dashboard" replace />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            ) : !loading ? (
+              <Home />
+            ) : (
+              <div className="loading-screen">
+                <div className="spinner"></div>
+                <p>Loading...</p>
+              </div>
+            )
+          }
+        />
         <Route path="/search" element={<SearchMedicines />} />
         <Route path="/medicines/:id" element={<MedicineDetails />} />
         <Route path="/pharmacies" element={<PharmacyList />} />
@@ -88,6 +118,7 @@ function App() {
       <Route element={<ProtectedRoute allowedRoles={['pharmacy', 'admin']} />}>
         <Route element={<DashboardLayout />}>
           <Route path="/pharmacy/dashboard" element={<PharmacyDashboard />} />
+          <Route path="/pharmacy/analytics" element={<PharmacyAnalytics />} />
           <Route path="/pharmacy/stock" element={<ManageStock />} />
           <Route path="/pharmacy/orders" element={<PharmacyOrders />} />
           <Route path="/pharmacy/profile" element={<PharmacyProfile />} />

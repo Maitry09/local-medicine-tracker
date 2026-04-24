@@ -5,57 +5,68 @@ import Alert from '../models/Alert.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
 
 // Get my pharmacy stock (pharmacy owner)
+// GET /api/stock/
 export const getMyStock = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, search, category, inStock, lowStock } = req.query;
 
   const pharmacy = await Pharmacy.findOne({ owner: req.userId });
-  
-  if (!pharmacy) {
-    return sendError(res, 404, 'Pharmacy not found');
-  }
+  if (!pharmacy) return sendError(res, 404, 'Pharmacy not found');
 
-  const stockQuery = { pharmacy: pharmacy._id };
+  // FIXED: Build the full query including medicine filters using aggregation pipeline
+  // This moves filtering BEFORE pagination — results and count are always consistent
 
-  if (inStock === 'true') {
-    stockQuery.quantity = { $gt: 0 };
-    stockQuery.isAvailable = true;
-  }
+  const pipeline = [
+    // Step 1: Match stock for this pharmacy
+    { $match: { pharmacy: pharmacy._id } },
 
-  if (lowStock === 'true') {
-    stockQuery.quantity = { $gt: 0, $lte: 10 };
-  }
-
-  let stock = await Stock.find(stockQuery)
-    .populate('medicine')
-    .limit(limit * 1)
-    .skip((page - 1) * limit)
-    .sort({ lastUpdated: -1 });
-
-  // Filter by search/category
-  if (search || category) {
-    stock = stock.filter(item => {
-      let match = true;
-      if (search) {
-        const searchLower = search.toLowerCase();
-        match = match && (
-          item.medicine.name.toLowerCase().includes(searchLower) ||
-          (item.medicine.genericName && item.medicine.genericName.toLowerCase().includes(searchLower))
-        );
+    // Step 2: Join with medicines collection
+    {
+      $lookup: {
+        from: 'medicines',
+        localField: 'medicine',
+        foreignField: '_id',
+        as: 'medicine'
       }
-      if (category) {
-        match = match && item.medicine.category === category;
-      }
-      return match;
-    });
-  }
+    },
+    { $unwind: '$medicine' },
 
-  const total = await Stock.countDocuments(stockQuery);
+    // Step 3: Apply all filters BEFORE pagination
+    ...(inStock === 'true' ? [{ $match: { quantity: { $gt: 0 }, isAvailable: true } }] : []),
+    ...(lowStock === 'true' ? [{ $match: { quantity: { $gt: 0, $lte: 10 } } }] : []),
+    ...(search ? [{
+      $match: {
+        $or: [
+          { 'medicine.name': { $regex: search, $options: 'i' } },
+          { 'medicine.genericName': { $regex: search, $options: 'i' } }
+        ]
+      }
+    }] : []),
+    ...(category ? [{ $match: { 'medicine.category': category } }] : []),
+
+    // Step 4: Sort
+    { $sort: { lastUpdated: -1 } },
+
+    // Step 5: Facet for pagination + total in one query
+    {
+      $facet: {
+        stock: [
+          { $skip: (parseInt(page) - 1) * parseInt(limit) },
+          { $limit: parseInt(limit) }
+        ],
+        totalCount: [{ $count: 'count' }]
+      }
+    }
+  ];
+
+  const [result] = await Stock.aggregate(pipeline);
+  const stock = result.stock;
+  const total = result.totalCount[0]?.count || 0;
 
   sendSuccess(res, 200, {
     stock,
     pagination: {
       current: parseInt(page),
-      pages: Math.ceil(total / limit),
+      pages: Math.ceil(total / parseInt(limit)),
       total
     }
   }, 'Stock fetched successfully');
@@ -99,11 +110,20 @@ export const addStock = asyncHandler(async (req, res) => {
   });
 
   // Trigger alerts for users waiting for this medicine
-  await triggerAvailabilityAlerts(medicineId, pharmacy._id, price);
-
   await stock.populate('medicine');
 
+  // FIXED: Send response immediately, then process alerts in background
+  // The pharmacy owner gets instant feedback; alerts run after
   sendSuccess(res, 201, { stock }, 'Stock added successfully');
+
+  // Process alerts asynchronously — runs after response is sent
+  setImmediate(async () => {
+    try {
+      await triggerAvailabilityAlerts(medicineId, pharmacy._id, price);
+    } catch (err) {
+      console.error('Error in background alert trigger:', err.message);
+    }
+  });
 });
 
 // Update stock item (pharmacy owner)
@@ -144,11 +164,18 @@ export const updateStock = asyncHandler(async (req, res) => {
   await stock.populate('medicine');
 
   // Trigger price drop alerts if price decreased
-  if (price && price < previousPrice) {
-    await triggerPriceDropAlerts(stock.medicine._id, pharmacy._id, price);
-  }
-
   sendSuccess(res, 200, { stock }, 'Stock updated successfully');
+
+  //Run price drop alerts in background
+  if (price && price < previousPrice) {
+    setImmediate(async () => {
+      try {
+        await triggerPriceDropAlerts(stock.medicine._id, pharmacy._id, price);
+      } catch (err) {
+        console.error('Error in background price alert trigger:', err.message);
+      }
+    });
+  }
 });
 
 // Delete stock item (pharmacy owner)

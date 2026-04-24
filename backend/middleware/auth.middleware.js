@@ -1,3 +1,4 @@
+import logger from '../utils/logger.js';
 import { verifyAccessToken } from '../utils/jwt.js';
 import User from '../models/User.js';
 import { sendError } from '../utils/errorHandler.js';
@@ -9,7 +10,7 @@ export const authMiddleware = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ No authorization header or invalid format');
+      logger.debug('No authorization header or invalid format');
       return sendError(res, 401, 'Access denied. No token provided');
     }
 
@@ -19,7 +20,7 @@ export const authMiddleware = async (req, res, next) => {
     const decoded = verifyAccessToken(token);
     
     if (!decoded) {
-      console.log('❌ Token verification failed');
+      logger.debug('Token verification failed');
       return sendError(res, 401, 'Invalid or expired token');
     }
 
@@ -27,12 +28,12 @@ export const authMiddleware = async (req, res, next) => {
     const user = await User.findById(decoded.userId);
     
     if (!user) {
-      console.log('❌ User not found for token');
+      logger.debug('User not found for token');
       return sendError(res, 401, 'User not found');
     }
 
     if (!user.isActive) {
-      console.log('❌ User account is deactivated');
+      logger.debug('User account is deactivated');
       return sendError(res, 401, 'Account has been deactivated');
     }
 
@@ -41,11 +42,11 @@ export const authMiddleware = async (req, res, next) => {
     req.userId = decoded.userId;
     req.userRole = decoded.role;
     
-    console.log('✅ User authenticated:', { userId: decoded.userId, role: decoded.role });
+    logger.info(' User authenticated:', { userId: decoded.userId, role: decoded.role });
     
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error.message);
+    logger.error('Auth middleware error:', error.message);
     return sendError(res, 401, 'Authentication failed');
   }
 };
@@ -58,11 +59,11 @@ export const requireRole = (...allowedRoles) => {
     }
 
     if (!allowedRoles.includes(req.user.role)) {
-      console.log(`❌ Role check failed. User role: ${req.user.role}, Required: ${allowedRoles.join(', ')}`);
+      logger.debug(` Role check failed. User role: ${req.user.role}, Required: ${allowedRoles.join(', ')}`);
       return sendError(res, 403, `Access denied. Required roles: ${allowedRoles.join(', ')}`);
     }
 
-    console.log(`✅ Role check passed for ${req.user.role}`);
+    logger.debug(` Role check passed for ${req.user.role}`);
     next();
   };
 };
@@ -126,16 +127,16 @@ export const requirePermission = (permission) => {
     const allowedRoles = PERMISSIONS[permission];
     
     if (!allowedRoles) {
-      console.error(`❌ Permission '${permission}' not defined in PERMISSIONS object`);
+      logger.error(` Permission '${permission}' not defined in PERMISSIONS object`);
       return sendError(res, 500, 'Permission configuration error');
     }
 
     if (!allowedRoles.includes(req.user.role)) {
-      console.log(`❌ Permission denied. User role: ${req.user.role}, Required permission: ${permission}`);
+      logger.debug(` Permission denied. User role: ${req.user.role}, Required permission: ${permission}`);
       return sendError(res, 403, `Access denied. Missing permission: ${permission}`);
     }
 
-    console.log(`✅ Permission check passed: ${permission} for ${req.user.role}`);
+    logger.info(`✅ Permission check passed: ${permission} for ${req.user.role}`);
     next();
   };
 };
@@ -146,7 +147,7 @@ export const requireOwnership = (Model, paramName = 'id', ownerField = 'userId')
     try {
       // Admins bypass ownership check
       if (req.user.role === 'admin') {
-        console.log('✅ Admin user - ownership check bypassed');
+        logger.info(' Admin user - ownership check bypassed');
         return next();
       }
 
@@ -162,15 +163,15 @@ export const requireOwnership = (Model, paramName = 'id', ownerField = 'userId')
       const userId = req.userId.toString();
 
       if (ownerId !== userId) {
-        console.log(`❌ Ownership check failed. Resource owner: ${ownerId}, User: ${userId}`);
+        logger.debug(` Ownership check failed. Resource owner: ${ownerId}, User: ${userId}`);
         return sendError(res, 403, 'Access denied. You do not own this resource');
       }
 
-      console.log('✅ Ownership verified');
+      logger.info(' Ownership verified');
       req.resource = resource;
       next();
     } catch (error) {
-      console.error('Ownership check error:', error.message);
+      logger.error('Ownership check error:', error.message);
       return sendError(res, 500, 'Error checking resource ownership');
     }
   };
@@ -182,7 +183,7 @@ export const requirePharmacyOwnership = (Model, paramName = 'id') => {
     try {
       // Admins bypass ownership check
       if (req.user.role === 'admin') {
-        console.log('✅ Admin user - pharmacy ownership check bypassed');
+        logger.info(' Admin user - pharmacy ownership check bypassed');
         return next();
       }
 
@@ -207,15 +208,15 @@ export const requirePharmacyOwnership = (Model, paramName = 'id') => {
       }
 
       if (pharmacyId !== resourcePharmacyId) {
-        console.log(`❌ Pharmacy ownership check failed. Resource pharmacy: ${resourcePharmacyId}, User pharmacy: ${pharmacyId}`);
+        logger.debug(` Pharmacy ownership check failed. Resource pharmacy: ${resourcePharmacyId}, User pharmacy: ${pharmacyId}`);
         return sendError(res, 403, 'Access denied. This resource belongs to another pharmacy');
       }
 
-      console.log('✅ Pharmacy ownership verified');
+      logger.info(' Pharmacy ownership verified');
       req.resource = resource;
       next();
     } catch (error) {
-      console.error('Pharmacy ownership check error:', error.message);
+      logger.error('Pharmacy ownership check error:', error.message);
       return sendError(res, 500, 'Error checking pharmacy ownership');
     }
   };
@@ -236,7 +237,7 @@ export const optionalAuth = async (req, res, next) => {
           req.user = user;
           req.userId = decoded.userId;
           req.userRole = decoded.role;
-          console.log('✅ Optional auth - user identified:', decoded.userId);
+          logger.info(' Optional auth - user identified:', decoded.userId);
         }
       }
     }

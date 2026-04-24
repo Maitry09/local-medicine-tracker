@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const CartContext = createContext(null);
 
+const CART_STORAGE_KEY = 'medicine_tracker_cart';
+
 export const useCart = () => {
   const context = useContext(CartContext);
   if (!context) {
@@ -11,161 +13,118 @@ export const useCart = () => {
 };
 
 export const CartProvider = ({ children }) => {
-  const [items, setItems] = useState([]);
-  const [pharmacyId, setPharmacyId] = useState(null);
-  const [pharmacyInfo, setPharmacyInfo] = useState(null);
 
-  // Load cart from localStorage on mount
-  useEffect(() => {
-    const savedCart = localStorage.getItem('cart');
-    if (savedCart) {
-      const { items, pharmacyId, pharmacyInfo } = JSON.parse(savedCart);
-      setItems(items || []);
-      setPharmacyId(pharmacyId || null);
-      setPharmacyInfo(pharmacyInfo || null);
+  // FIXED: Initialize cart from localStorage so it survives page refresh
+  const [cartItems, setCartItems] = useState(() => {
+    try {
+      const saved = localStorage.getItem(CART_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch (err) {
+      // If localStorage is corrupted, start fresh
+      console.error('Failed to load cart from storage:', err);
+      return [];
     }
-  }, []);
+  });
 
-  // Save cart to localStorage on change
+  // FIXED: Persist cart to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify({ items, pharmacyId, pharmacyInfo }));
-  }, [items, pharmacyId, pharmacyInfo]);
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
+    } catch (err) {
+      console.error('Failed to save cart to storage:', err);
+    }
+  }, [cartItems]);
 
-  const addItem = (item, pharmacy) => {
-    // If cart has items from different pharmacy, ask to clear
-    if (pharmacyId && pharmacyId !== pharmacy._id) {
-      const confirm = window.confirm(
-        'Your cart contains items from a different pharmacy. Would you like to clear it and add this item?'
+  const addToCart = (medicine, pharmacy, stockItem) => {
+    setCartItems(prev => {
+      const existingIndex = prev.findIndex(
+        item => item.medicineId === medicine._id && item.pharmacyId === pharmacy._id
       );
-      if (!confirm) return false;
-      clearCart();
-    }
 
-    setPharmacyId(pharmacy._id);
-    setPharmacyInfo({
-      _id: pharmacy._id,
-      name: pharmacy.name,
-      address: pharmacy.address
-    });
-
-    setItems(prev => {
-      const existingIndex = prev.findIndex(i => i.medicineId === item.medicineId);
-      
-      if (existingIndex > -1) {
+      if (existingIndex >= 0) {
+        // Update quantity if already in cart
         const updated = [...prev];
-        updated[existingIndex].quantity += item.quantity;
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          quantity: updated[existingIndex].quantity + 1
+        };
         return updated;
       }
-      
-      return [...prev, item];
-    });
 
-    return true;
+      // Add new item
+      return [...prev, {
+        id: `${medicine._id}_${pharmacy._id}`,
+        medicineId: medicine._id,
+        medicineName: medicine.name,
+        genericName: medicine.genericName,
+        pharmacyId: pharmacy._id,
+        pharmacyName: pharmacy.name,
+        price: stockItem.price,
+        discount: stockItem.discount || 0,
+        quantity: 1,
+        maxQuantity: stockItem.quantity,
+        prescriptionRequired: medicine.prescriptionRequired
+      }];
+    });
   };
 
-  const updateQuantity = (medicineId, pharmacyId, quantity) => {
-    if (quantity < 1) {
-      removeFromCart(medicineId, pharmacyId);
+  const removeFromCart = (itemId, pharmacyId) => {
+    setCartItems(prev =>
+      prev.filter(item => !(item.medicineId === itemId && item.pharmacyId === pharmacyId))
+    );
+  };
+
+  const updateQuantity = (itemId, pharmacyId, newQuantity) => {
+    if (newQuantity < 1) {
+      removeFromCart(itemId, pharmacyId);
       return;
     }
-
-    setItems(prev => 
-      prev.map(item => 
-        item.medicineId === medicineId && item.pharmacyId === pharmacyId
-          ? { ...item, quantity } 
+    setCartItems(prev =>
+      prev.map(item =>
+        item.medicineId === itemId && item.pharmacyId === pharmacyId
+          ? { ...item, quantity: Math.min(newQuantity, item.maxQuantity) }
           : item
       )
     );
   };
 
-  const removeFromCart = (medicineId, pharmacyId) => {
-    setItems(prev => {
-      const filtered = prev.filter(item => 
-        !(item.medicineId === medicineId && item.pharmacyId === pharmacyId)
-      );
-      if (filtered.length === 0) {
-        setPharmacyId(null);
-        setPharmacyInfo(null);
-      }
-      return filtered;
-    });
-  };
-
-  const removeItem = (medicineId) => {
-    setItems(prev => {
-      const filtered = prev.filter(item => item.medicineId !== medicineId);
-      if (filtered.length === 0) {
-        setPharmacyId(null);
-        setPharmacyInfo(null);
-      }
-      return filtered;
-    });
-  };
-
   const clearCart = () => {
-    setItems([]);
-    setPharmacyId(null);
-    setPharmacyInfo(null);
-    localStorage.removeItem('cart');
-  };
-
-  const getSubtotal = () => {
-    return items.reduce((total, item) => {
-      const itemPrice = item.price - (item.price * (item.discount || 0) / 100);
-      return total + (itemPrice * item.quantity);
-    }, 0);
-  };
-
-  const getTax = () => {
-    return getSubtotal() * 0.05;
-  };
-
-  const getTotal = (deliveryCharge = 0) => {
-    return getSubtotal() + getTax() + deliveryCharge;
+    setCartItems([]);
+    localStorage.removeItem(CART_STORAGE_KEY);
   };
 
   const getCartTotal = () => {
-    return getSubtotal();
-  };
-
-  const getItemCount = () => {
-    return items.reduce((count, item) => count + item.quantity, 0);
+    return cartItems.reduce((total, item) => {
+      const discountedPrice = item.price - (item.price * item.discount / 100);
+      return total + (discountedPrice * item.quantity);
+    }, 0);
   };
 
   const getItemsByPharmacy = () => {
-    const grouped = {};
-    items.forEach(item => {
-      const pId = item.pharmacyId;
-      if (!grouped[pId]) {
-        grouped[pId] = [];
-      }
-      grouped[pId].push(item);
-    });
-    return grouped;
+    return cartItems.reduce((groups, item) => {
+      const key = item.pharmacyId;
+      if (!groups[key]) groups[key] = { pharmacyName: item.pharmacyName, items: [] };
+      groups[key].items.push(item);
+      return groups;
+    }, {});
   };
 
-  const value = {
-    items,
-    cartItems: items,
-    pharmacyId,
-    pharmacyInfo,
-    addItem,
-    updateQuantity,
-    removeFromCart,
-    removeItem,
-    clearCart,
-    getSubtotal,
-    getTax,
-    getTotal,
-    getCartTotal,
-    getItemCount,
-    getItemsByPharmacy,
-    isEmpty: items.length === 0
-  };
+  const getTotalItems = () => cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <CartContext.Provider value={value}>
+    <CartContext.Provider value={{
+      cartItems,
+      addToCart,
+      removeFromCart,
+      updateQuantity,
+      clearCart,
+      getCartTotal,
+      getItemsByPharmacy,
+      getTotalItems
+    }}>
       {children}
     </CartContext.Provider>
   );
 };
+
+export default CartContext;

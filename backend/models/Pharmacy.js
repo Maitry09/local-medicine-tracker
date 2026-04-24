@@ -27,31 +27,18 @@ const pharmacySchema = new mongoose.Schema({
     required: [true, 'Phone number is required']
   },
   address: {
-    street: {
-      type: String,
-      required: true
-    },
-    city: {
-      type: String,
-      required: true
-    },
-    state: {
-      type: String,
-      required: true
-    },
-    pincode: {
-      type: String,
-      required: true
-    },
+    street: { type: String, required: true },
+    city: { type: String, required: true },
+    state: { type: String, required: true },
+    pincode: { type: String, required: true },
     coordinates: {
-      lat: {
-        type: Number,
-        required: true
-      },
-      lng: {
-        type: Number,
-        required: true
-      }
+      lat: { type: Number, required: true },
+      lng: { type: Number, required: true }
+    },
+    // GeoJSON format required for MongoDB $nearSphere queries
+    location: {
+      type: { type: String, enum: ['Point'], default: 'Point' },
+      coordinates: { type: [Number] }  // [longitude, latitude] — MongoDB uses [lng, lat] order!
     }
   },
   operatingHours: {
@@ -90,8 +77,20 @@ const pharmacySchema = new mongoose.Schema({
   timestamps: true
 });
 
+pharmacySchema.pre('save', function(next) {
+  // Auto-populate GeoJSON location from coordinates
+  if (this.address && this.address.coordinates) {
+    this.address.location = {
+      type: 'Point',
+      // IMPORTANT: MongoDB GeoJSON is [longitude, latitude] — reversed from lat/lng!
+      coordinates: [this.address.coordinates.lng, this.address.coordinates.lat]
+    };
+  }
+  next();
+});
+
 // Index for geospatial queries
-pharmacySchema.index({ 'address.coordinates': '2dsphere' });
+pharmacySchema.index({ 'address.location': '2dsphere' });
 
 // Virtual for stock
 pharmacySchema.virtual('stock', {

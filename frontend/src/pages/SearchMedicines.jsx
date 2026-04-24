@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { medicineAPI } from '../services/api';
 
@@ -7,68 +7,77 @@ const SearchMedicines = () => {
   const [medicines, setMedicines] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [pagination, setPagination] = useState({ current: 1, pages: 1, total: 0 });
-  
-  const [filters, setFilters] = useState({
-    q: searchParams.get('q') || '',
-    category: searchParams.get('category') || '',
-    prescriptionRequired: searchParams.get('prescription') || '',
-    page: parseInt(searchParams.get('page')) || 1
-  });
+
+  // Keep filters as individual pieces of state — avoids object-reference dep issues
+  const [query, setQuery] = useState(searchParams.get('q') || '');
+  const [category, setCategory] = useState(searchParams.get('category') || '');
+  const [prescription, setPrescription] = useState(searchParams.get('prescription') || '');
+  const [page, setPage] = useState(parseInt(searchParams.get('page')) || 1);
+
+  // Debounce only the text query — other filters apply immediately
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 350);
+    return () => clearTimeout(t);
+  }, [query]);
 
   useEffect(() => {
-    fetchCategories();
+    medicineAPI.getCategories()
+      .then(res => setCategories(res.data.data.categories || []))
+      .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    fetchMedicines();
-  }, [filters]);
-
-  const fetchCategories = async () => {
-    try {
-      const response = await medicineAPI.getCategories();
-      setCategories(response.data.data.categories);
-    } catch (error) {
-      console.error('Failed to fetch categories:', error);
-    }
-  };
-
-  const fetchMedicines = async () => {
+  // FIXED: depend on individual primitives, not an object — no infinite loop
+  const fetchMedicines = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
-      const params = { ...filters, limit: 12 };
-      if (!params.q) delete params.q;
-      if (!params.category) delete params.category;
-      if (!params.prescriptionRequired) delete params.prescriptionRequired;
+      const params = { page, limit: 12 };
+      if (debouncedQuery) params.q = debouncedQuery;
+      if (category) params.category = category;
+      if (prescription) params.prescriptionRequired = prescription;
 
       const response = await medicineAPI.search(params);
-      setMedicines(response.data.data.medicines);
-      setPagination(response.data.data.pagination);
+      setMedicines(response.data.data.medicines || []);
+      setPagination(response.data.data.pagination || { current: 1, pages: 1, total: 0 });
 
-      // Update URL params
+      // Sync URL without triggering another render
       const newParams = new URLSearchParams();
-      if (filters.q) newParams.set('q', filters.q);
-      if (filters.category) newParams.set('category', filters.category);
-      if (filters.page > 1) newParams.set('page', filters.page);
-      setSearchParams(newParams);
-    } catch (error) {
-      console.error('Failed to fetch medicines:', error);
+      if (debouncedQuery) newParams.set('q', debouncedQuery);
+      if (category) newParams.set('category', category);
+      if (page > 1) newParams.set('page', page);
+      setSearchParams(newParams, { replace: true });
+    } catch (err) {
+      setError('Failed to fetch medicines. Please check your connection and try again.');
+      setMedicines([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [debouncedQuery, category, prescription, page]); // primitives only — safe
+
+  useEffect(() => {
+    fetchMedicines();
+  }, [fetchMedicines]);
 
   const handleSearch = (e) => {
     e.preventDefault();
-    setFilters(prev => ({ ...prev, page: 1 }));
+    setPage(1); // reset to first page on new search
   };
 
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
+  const handleCategoryChange = (val) => {
+    setCategory(val);
+    setPage(1);
   };
 
-  const handlePageChange = (page) => {
-    setFilters(prev => ({ ...prev, page }));
+  const handlePrescriptionChange = (val) => {
+    setPrescription(val);
+    setPage(1);
+  };
+
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -89,15 +98,15 @@ const SearchMedicines = () => {
                   type="text"
                   className="form-input"
                   placeholder="Search by medicine name..."
-                  value={filters.q}
-                  onChange={(e) => setFilters(prev => ({ ...prev, q: e.target.value }))}
+                  value={query}
+                  onChange={(e) => { setQuery(e.target.value); setPage(1); }}
                 />
               </div>
               <div style={{ flex: '0 1 200px' }}>
                 <select
                   className="form-select"
-                  value={filters.category}
-                  onChange={(e) => handleFilterChange('category', e.target.value)}
+                  value={category}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
                 >
                   <option value="">All Categories</option>
                   {categories.map(cat => (
@@ -108,8 +117,8 @@ const SearchMedicines = () => {
               <div style={{ flex: '0 1 180px' }}>
                 <select
                   className="form-select"
-                  value={filters.prescriptionRequired}
-                  onChange={(e) => handleFilterChange('prescriptionRequired', e.target.value)}
+                  value={prescription}
+                  onChange={(e) => handlePrescriptionChange(e.target.value)}
                 >
                   <option value="">All Medicines</option>
                   <option value="false">OTC Only</option>
@@ -123,6 +132,16 @@ const SearchMedicines = () => {
           </form>
         </div>
       </div>
+
+      {/* Error state */}
+      {error && (
+        <div className="alert alert-danger" style={{ marginBottom: '1rem' }}>
+          {error}
+          <button onClick={fetchMedicines} style={{ marginLeft: '1rem' }} className="btn btn-sm btn-outline">
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Results */}
       {loading ? (
@@ -201,7 +220,7 @@ const SearchMedicines = () => {
             </div>
           )}
         </>
-      ) : (
+      ) : !loading && (
         <div className="empty-state">
           <div className="empty-state-icon">💊</div>
           <h3 className="empty-state-title">No medicines found</h3>
