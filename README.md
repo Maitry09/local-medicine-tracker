@@ -331,4 +331,3 @@ cd frontend && npm run dev
 ## License
 
 MIT
->>>>>>> 358d8bcf219a13dd065b8fc78f9e0c08dfd5176d
