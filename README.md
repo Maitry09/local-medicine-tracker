@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # MedFinder - Local Medicine Availability Tracker
 
 A full-stack MERN application to find nearby pharmacies with specific medicines in stock in real-time.
@@ -332,6 +331,4 @@ cd frontend && npm run dev
 ## License
 
 MIT
-=======
-# local-medicine-tracker
 >>>>>>> 358d8bcf219a13dd065b8fc78f9e0c08dfd5176d
