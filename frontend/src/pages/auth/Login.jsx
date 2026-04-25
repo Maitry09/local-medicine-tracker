@@ -62,17 +62,14 @@ const Login = () => {
         3000
       );
 
-      // Redirect based on role — always go to the correct dashboard
+      // Redirect based on role
       setTimeout(() => {
         if (user.role === 'admin') {
           navigate('/admin/dashboard', { replace: true });
         } else if (user.role === 'pharmacy') {
           navigate('/pharmacy/dashboard', { replace: true });
         } else {
-          // For patients: if they came from a protected page, go back there
-          // Otherwise always go to /dashboard, never to "/" (blank)
-          const safePath = from && from !== '/' ? from : '/dashboard';
-          navigate(safePath, { replace: true });
+          navigate(from, { replace: true });
         }
       }, 1000);
     } catch (error) {

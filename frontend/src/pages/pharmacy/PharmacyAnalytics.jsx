@@ -30,7 +30,7 @@ const PharmacyAnalytics = () => {
       console.log('📦 Stock response:', stockRes.data);
 
       const orders = ordersRes.data.orders || [];
-      const stocks = stockRes.data.stocks || [];
+      const stocks = stockRes.data.data?.stocks || [];
 
       // Calculate analytics
       const totalRevenue = orders
@@ -41,21 +41,23 @@ const PharmacyAnalytics = () => {
 
       // Top medicines by quantity sold
       const medicineMap = {};
-      orders.forEach((order) => {
+            orders.forEach((order) => {
         if (order.items && Array.isArray(order.items)) {
           order.items.forEach((item) => {
             const key = item.medicineId || item.medicine?._id;
+            const name = item.medicine?.name || item.medicineName || key; // ← capture name
             if (key) {
-              medicineMap[key] = (medicineMap[key] || 0) + (item.quantity || 0);
+              if (!medicineMap[key]) medicineMap[key] = { quantity: 0, name };
+              medicineMap[key].quantity += (item.quantity || 0);
             }
           });
         }
       });
 
       const topMedicines = Object.entries(medicineMap)
-        .sort(([, a], [, b]) => b - a)
+        .sort(([, a], [, b]) => b.quantity - a.quantity)
         .slice(0, 5)
-        .map(([id, qty]) => ({ medicineId: id, quantity: qty }));
+        .map(([id, { quantity, name }]) => ({ medicineId: id, name, quantity }));
 
       // Revenue by order status
       const revenueByStatus = {};
@@ -154,7 +156,7 @@ const PharmacyAnalytics = () => {
             {analytics.topMedicines.map((medicine, index) => (
               <div key={index} style={{ display: 'grid', gridTemplateColumns: '50px 1fr 100px', gap: '10px', alignItems: 'center', padding: '10px', background: '#f9f9f9', borderRadius: '6px' }}>
                 <span style={{ fontWeight: '600', color: '#1976d2' }}>#{index + 1}</span>
-                <span style={{ fontWeight: '500' }}>{medicine.medicineId}</span>
+                <span style={{ fontWeight: '500' }}>{medicine.name}</span>
                 <span style={{ textAlign: 'right', color: '#666' }}>Qty: {medicine.quantity}</span>
               </div>
             ))}

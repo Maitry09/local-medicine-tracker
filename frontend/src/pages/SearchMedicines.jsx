@@ -55,7 +55,7 @@ const SearchMedicines = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedQuery, category, prescription, page]); // primitives only — safe
+  }, [debouncedQuery, category, prescription, page, setSearchParams]); // primitives only — safe
 
   useEffect(() => {
     fetchMedicines();

@@ -44,16 +44,7 @@ import AdminOrders from './pages/admin/AdminOrders';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
-  const { user, loading } = useAuth();
-  const [renderKey, setRenderKey] = useState(0);
-
-  console.log('🚀 App render:', { user, loading, userRole: user?.role, renderKey });
-
-  // Force re-render when user changes
-  useEffect(() => {
-    setRenderKey(prev => prev + 1);
-  }, [user]);
-
+  const { user, loading } = useAuth();  
   if (loading) {
     return (
       <div className="loading-screen">
@@ -64,7 +55,7 @@ function App() {
   }
 
   return (
-    <Routes key={renderKey}>
+    <Routes >
       {/* Public Routes */}
       <Route element={<MainLayout />}>
         <Route
