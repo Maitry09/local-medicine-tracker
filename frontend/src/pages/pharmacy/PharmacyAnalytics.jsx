@@ -30,7 +30,11 @@ const PharmacyAnalytics = () => {
       console.log('📦 Stock response:', stockRes.data);
 
       const orders = ordersRes.data.orders || [];
+<<<<<<< HEAD
       const stocks = stockRes.data.stocks || [];
+=======
+      const stocks = stockRes.data.data?.stocks || [];
+>>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
 
       // Calculate analytics
       const totalRevenue = orders
@@ -41,21 +45,38 @@ const PharmacyAnalytics = () => {
 
       // Top medicines by quantity sold
       const medicineMap = {};
+<<<<<<< HEAD
       orders.forEach((order) => {
         if (order.items && Array.isArray(order.items)) {
           order.items.forEach((item) => {
             const key = item.medicineId || item.medicine?._id;
             if (key) {
               medicineMap[key] = (medicineMap[key] || 0) + (item.quantity || 0);
+=======
+            orders.forEach((order) => {
+        if (order.items && Array.isArray(order.items)) {
+          order.items.forEach((item) => {
+            const key = item.medicineId || item.medicine?._id;
+            const name = item.medicine?.name || item.medicineName || key; // ← capture name
+            if (key) {
+              if (!medicineMap[key]) medicineMap[key] = { quantity: 0, name };
+              medicineMap[key].quantity += (item.quantity || 0);
+>>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
             }
           });
         }
       });
 
       const topMedicines = Object.entries(medicineMap)
+<<<<<<< HEAD
         .sort(([, a], [, b]) => b - a)
         .slice(0, 5)
         .map(([id, qty]) => ({ medicineId: id, quantity: qty }));
+=======
+        .sort(([, a], [, b]) => b.quantity - a.quantity)
+        .slice(0, 5)
+        .map(([id, { quantity, name }]) => ({ medicineId: id, name, quantity }));
+>>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
 
       // Revenue by order status
       const revenueByStatus = {};
@@ -154,7 +175,11 @@ const PharmacyAnalytics = () => {
             {analytics.topMedicines.map((medicine, index) => (
               <div key={index} style={{ display: 'grid', gridTemplateColumns: '50px 1fr 100px', gap: '10px', alignItems: 'center', padding: '10px', background: '#f9f9f9', borderRadius: '6px' }}>
                 <span style={{ fontWeight: '600', color: '#1976d2' }}>#{index + 1}</span>
+<<<<<<< HEAD
                 <span style={{ fontWeight: '500' }}>{medicine.medicineId}</span>
+=======
+                <span style={{ fontWeight: '500' }}>{medicine.name}</span>
+>>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
                 <span style={{ textAlign: 'right', color: '#666' }}>Qty: {medicine.quantity}</span>
               </div>
             ))}

@@ -51,6 +51,15 @@ api.interceptors.response.use(
 
     // If 401 and we haven't tried refreshing yet
     if (error.response?.status === 401 && !originalRequest._retry) {
+      
+      if (originalRequest.url?.includes('/auth/refresh-token')) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+        return Promise.reject(error);
+      }
+      
       originalRequest._retry = true;
 
       try {
@@ -110,10 +119,11 @@ export const pharmacyAPI = {
   getStock: (id, params) => api.get(`/pharmacies/${id}/stock`, { params }),
   register: (data) => api.post('/pharmacies/register', data),
   getMyPharmacy: () => api.get('/pharmacies/my/details'),
+  getMyPharmacyStock: (params) => api.get('/stock', { params }), // ← ADD THIS
   updateMyPharmacy: (data) => api.put('/pharmacies/my/update', data),
   verify: (id) => api.patch(`/pharmacies/${id}/verify`),
   disable: (id) => api.patch(`/pharmacies/${id}/disable`),
-  delete: (id) => api.delete(`/pharmacies/${id}`)
+  delete: (id) => api.delete(`/pharmacies/${id}`),
 };
 
 // Stock API
