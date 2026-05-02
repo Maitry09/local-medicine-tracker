@@ -154,8 +154,7 @@ export const mongoIdValidation = (paramName = 'id') => [
 export const searchValidation = [
   query('q')
     .optional()
-    .trim()
-    .isLength({ min: 2 }).withMessage('Search query must be at least 2 characters'),
+    .trim(),
   query('page')
     .optional()
     .isInt({ min: 1 }).withMessage('Page must be a positive integer'),

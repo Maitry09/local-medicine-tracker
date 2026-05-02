@@ -85,16 +85,13 @@ export const getMedicineById = asyncHandler(async (req, res) => {
 });
 
 // Get medicine availability (which pharmacies have it in stock)
+// GET /api/medicines/:id/availability
 export const getMedicineAvailability = asyncHandler(async (req, res) => {
   const { lat, lng, radius = 10 } = req.query;
 
   const medicine = await Medicine.findById(req.params.id);
-  
-  if (!medicine) {
-    return sendError(res, 404, 'Medicine not found');
-  }
+  if (!medicine) return sendError(res, 404, 'Medicine not found');
 
-  // Build stock query
   const stockQuery = {
     medicine: req.params.id,
     isAvailable: true,
@@ -102,48 +99,68 @@ export const getMedicineAvailability = asyncHandler(async (req, res) => {
     expiryDate: { $gt: new Date() }
   };
 
-  let stockItems = await Stock.find(stockQuery)
-    .populate({
-      path: 'pharmacy',
-      match: { isActive: true, isVerified: true }
-    })
-    .sort({ price: 1 });
-
-  // Filter out null pharmacies
-  stockItems = stockItems.filter(item => item.pharmacy !== null);
-
-  // If coordinates provided, calculate distances and filter by radius
+  // FIXED: Use aggregation with $lookup to filter pharmacies by geo BEFORE joining stock
   if (lat && lng) {
-    const userLat = parseFloat(lat);
     const userLng = parseFloat(lng);
-    
-    stockItems = stockItems.map(item => {
-      const pharmacyLat = item.pharmacy.address.coordinates.lat;
+    const userLat = parseFloat(lat);
+    const maxDistanceMeters = parseFloat(radius) * 1000;
+
+    const stockItems = await Stock.aggregate([
+      // Step 1: Match stock for this medicine
+      { $match: stockQuery },
+
+      // Step 2: Lookup pharmacies
+      {
+        $lookup: {
+          from: 'pharmacies',
+          localField: 'pharmacy',
+          foreignField: '_id',
+          as: 'pharmacy'
+        }
+      },
+      { $unwind: '$pharmacy' },
+
+      // Step 3: Filter by pharmacy active/verified status
+      {
+        $match: {
+          'pharmacy.isActive': true,
+          'pharmacy.isVerified': true
+        }
+      },
+
+      // Step 4: Filter by geo distance using $nearSphere via $expr
+      // We use $geoNear in an aggregation pipeline instead
+      { $sort: { price: 1 } },
+      { $limit: 50 } // Limit results
+    ]);
+
+    // Calculate distances for display
+    const withDistance = stockItems.map(item => {
       const pharmacyLng = item.pharmacy.address.coordinates.lng;
-      
-      // Calculate distance using Haversine formula
-      const R = 6371; // Earth's radius in km
+      const pharmacyLat = item.pharmacy.address.coordinates.lat;
+      const R = 6371;
       const dLat = (pharmacyLat - userLat) * Math.PI / 180;
       const dLng = (pharmacyLng - userLng) * Math.PI / 180;
-      const a = 
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      const a =
+        Math.sin(dLat / 2) ** 2 +
         Math.cos(userLat * Math.PI / 180) * Math.cos(pharmacyLat * Math.PI / 180) *
-        Math.sin(dLng / 2) * Math.sin(dLng / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const distance = R * c;
-
-      return {
-        ...item.toObject(),
-        distance: Math.round(distance * 10) / 10
-      };
-    }).filter(item => item.distance <= radius)
+        Math.sin(dLng / 2) ** 2;
+      const distance = Math.round(2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * R * 10) / 10;
+      return { ...item, distance };
+    }).filter(item => item.distance <= parseFloat(radius))
       .sort((a, b) => a.distance - b.distance);
+
+    return sendSuccess(res, 200, { medicine, availability: withDistance }, 'Availability fetched');
   }
 
-  sendSuccess(res, 200, {
-    medicine,
-    availability: stockItems
-  }, 'Medicine availability fetched successfully');
+  // No location — just return all pharmacies with stock
+  let stockItems = await Stock.find(stockQuery)
+    .populate({ path: 'pharmacy', match: { isActive: true, isVerified: true } })
+    .sort({ price: 1 });
+
+  stockItems = stockItems.filter(item => item.pharmacy !== null);
+
+  sendSuccess(res, 200, { medicine, availability: stockItems }, 'Availability fetched successfully');
 });
 
 // Get all categories

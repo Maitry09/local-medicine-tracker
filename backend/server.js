@@ -1,8 +1,12 @@
+import logger from './utils/logger.js';
 import dotenv from 'dotenv';
 import connectDB from './config/database.js';
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
+import mongoSanitize from 'express-mongo-sanitize';
 
 // Route imports
 import authRoutes from './routes/auth.routes.js';
@@ -23,6 +27,19 @@ console.log('📍 Environment:', process.env.NODE_ENV || 'development');
 
 // Initialize express app
 const app = express();
+
+// Security headers
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow frontend to fetch resources
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+    }
+  }
+}));
 
 // Middleware
 app.use(cors({
@@ -63,13 +80,32 @@ app.use((req, res, next) => {
 
 app.use(express.urlencoded({ extended: true }));
 
-// Request logger middleware (development only)
-if (process.env.NODE_ENV === 'development') {
-  app.use((req, res, next) => {
-    console.log(`📨 ${req.method} ${req.path}`);
-    next();
-  });
-}
+app.use(mongoSanitize({
+  replaceWith: '_',  // Replace $ and . with _ instead of removing (easier to debug)
+  onSanitize: ({ req, key }) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`⚠️  Sanitized field "${key}" in ${req.path}`);
+    }
+  }
+}));
+
+app.use((req, res, next) => {
+  logger.http(req.method, req.path);
+  next();
+});
+
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minute window
+  max: 200,                   // max 200 requests per window per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many requests. Please slow down.'
+  },
+  skip: (req) => process.env.NODE_ENV === 'test'
+});
+app.use(generalLimiter);
 
 // Health check route
 app.get('/api/health', (req, res) => {

@@ -1393,10 +1393,9 @@ h6 { font-size: 1rem; }
 .hero {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: var(--white);
-  padding: 4rem 1rem;
+  padding: 8rem 4rem 4rem 4rem;
   text-align: center;
   margin: -2rem -1rem 2rem -1rem;
-  padding: 4rem 1rem;
 }
 
 .hero-title {
@@ -4419,13 +4418,6 @@ img {
 
 /* Foldable Device Support */
 @supports (padding: max(0px)) {
-  body {
-    padding-left: max(1rem, env(safe-area-inset-left));
-    padding-right: max(1rem, env(safe-area-inset-right));
-    padding-top: max(1rem, env(safe-area-inset-top));
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
-  }
-
   .sidebar {
     padding-right: max(0, env(safe-area-inset-right));
   }

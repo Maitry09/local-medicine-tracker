@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { medicineAPI } from '../services/api';
 
@@ -7,69 +7,89 @@ const SearchMedicines = () => {
   const [medicines, setMedicines] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [pagination, setPagination] = useState({ current: 1, pages: 1, total: 0 });
-  
-  const [filters, setFilters] = useState({
-    q: searchParams.get('q') || '',
-    category: searchParams.get('category') || '',
-    prescriptionRequired: searchParams.get('prescription') || '',
-    page: parseInt(searchParams.get('page')) || 1
-  });
+
+  const [query, setQuery] = useState(searchParams.get('q') || '');
+  const [category, setCategory] = useState(searchParams.get('category') || '');
+  const [prescription, setPrescription] = useState(searchParams.get('prescription') || '');
+  const [page, setPage] = useState(parseInt(searchParams.get('page')) || 1);
+
+  // Debounce query
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 350);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  // Track mount to always fetch on mount (fixes back-navigation stale state)
+  const mountedRef = useRef(false);
 
   useEffect(() => {
-    fetchCategories();
+    medicineAPI.getCategories()
+      .then(res => setCategories(res.data.data.categories || []))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
-    fetchMedicines();
-  }, [filters]);
+    let cancelled = false;
 
-  const fetchCategories = async () => {
-    try {
-      const response = await medicineAPI.getCategories();
-      setCategories(response.data.data.categories);
-    } catch (error) {
-      console.error('Failed to fetch categories:', error);
-    }
-  };
+    const fetch = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const params = { page, limit: 12 };
+        if (debouncedQuery) params.q = debouncedQuery;
+        if (category) params.category = category;
+        if (prescription) params.prescriptionRequired = prescription;
 
-  const fetchMedicines = async () => {
-    setLoading(true);
-    try {
-      const params = { ...filters, limit: 12 };
-      if (!params.q) delete params.q;
-      if (!params.category) delete params.category;
-      if (!params.prescriptionRequired) delete params.prescriptionRequired;
+        const response = await medicineAPI.search(params);
+        if (cancelled) return;
 
-      const response = await medicineAPI.search(params);
-      setMedicines(response.data.data.medicines);
-      setPagination(response.data.data.pagination);
+        setMedicines(response.data.data.medicines || []);
+        setPagination(response.data.data.pagination || { current: 1, pages: 1, total: 0 });
 
-      // Update URL params
-      const newParams = new URLSearchParams();
-      if (filters.q) newParams.set('q', filters.q);
-      if (filters.category) newParams.set('category', filters.category);
-      if (filters.page > 1) newParams.set('page', filters.page);
-      setSearchParams(newParams);
-    } catch (error) {
-      console.error('Failed to fetch medicines:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        const newParams = new URLSearchParams();
+        if (debouncedQuery) newParams.set('q', debouncedQuery);
+        if (category) newParams.set('category', category);
+        if (page > 1) newParams.set('page', page);
+        setSearchParams(newParams, { replace: true });
+      } catch {
+        if (cancelled) return;
+        setError('Failed to fetch medicines. Please check your connection and try again.');
+        setMedicines([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setFilters(prev => ({ ...prev, page: 1 }));
-  };
+    fetch();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery, category, prescription, page]);
 
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
-  };
-
-  const handlePageChange = (page) => {
-    setFilters(prev => ({ ...prev, page }));
+  const handleCategoryChange = (val) => { setCategory(val); setPage(1); };
+  const handlePrescriptionChange = (val) => { setPrescription(val); setPage(1); };
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const refetch = () => {
+    setPage(p => p); // trigger re-render without changing deps
+    // Force by toggling a dummy state
+    setError('');
+    setLoading(true);
+    const params = { page, limit: 12 };
+    if (debouncedQuery) params.q = debouncedQuery;
+    if (category) params.category = category;
+    if (prescription) params.prescriptionRequired = prescription;
+    medicineAPI.search(params)
+      .then(res => {
+        setMedicines(res.data.data.medicines || []);
+        setPagination(res.data.data.pagination || { current: 1, pages: 1, total: 0 });
+      })
+      .catch(() => setError('Failed to fetch medicines.'))
+      .finally(() => setLoading(false));
   };
 
   return (
@@ -79,52 +99,42 @@ const SearchMedicines = () => {
         <p className="page-subtitle">Find medicines and check their availability at nearby pharmacies</p>
       </div>
 
-      {/* Search and Filters */}
       <div className="card mb-4">
         <div className="card-body">
-          <form onSubmit={handleSearch}>
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-              <div style={{ flex: '1 1 300px' }}>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Search by medicine name..."
-                  value={filters.q}
-                  onChange={(e) => setFilters(prev => ({ ...prev, q: e.target.value }))}
-                />
-              </div>
-              <div style={{ flex: '0 1 200px' }}>
-                <select
-                  className="form-select"
-                  value={filters.category}
-                  onChange={(e) => handleFilterChange('category', e.target.value)}
-                >
-                  <option value="">All Categories</option>
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ flex: '0 1 180px' }}>
-                <select
-                  className="form-select"
-                  value={filters.prescriptionRequired}
-                  onChange={(e) => handleFilterChange('prescriptionRequired', e.target.value)}
-                >
-                  <option value="">All Medicines</option>
-                  <option value="false">OTC Only</option>
-                  <option value="true">Prescription Only</option>
-                </select>
-              </div>
-              <button type="submit" className="btn btn-primary">
-                Search
-              </button>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 300px' }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Search by medicine name..."
+                value={query}
+                onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+              />
             </div>
-          </form>
+            <div style={{ flex: '0 1 200px' }}>
+              <select className="form-select" value={category} onChange={(e) => handleCategoryChange(e.target.value)}>
+                <option value="">All Categories</option>
+                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: '0 1 180px' }}>
+              <select className="form-select" value={prescription} onChange={(e) => handlePrescriptionChange(e.target.value)}>
+                <option value="">All Medicines</option>
+                <option value="false">OTC Only</option>
+                <option value="true">Prescription Only</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Results */}
+      {error && (
+        <div className="alert alert-danger" style={{ marginBottom: '1rem' }}>
+          {error}
+          <button onClick={refetch} style={{ marginLeft: '1rem' }} className="btn btn-sm btn-outline">Retry</button>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center" style={{ padding: '3rem' }}>
           <div className="spinner"></div>
@@ -132,29 +142,18 @@ const SearchMedicines = () => {
         </div>
       ) : medicines.length > 0 ? (
         <>
-          <p className="text-muted mb-3">
-            Found {pagination.total} medicine{pagination.total !== 1 ? 's' : ''}
-          </p>
-          
+          <p className="text-muted mb-3">Found {pagination.total} medicine{pagination.total !== 1 ? 's' : ''}</p>
           <div className="grid grid-4">
             {medicines.map((medicine) => (
-              <Link 
-                key={medicine._id} 
-                to={`/medicines/${medicine._id}`}
-                style={{ textDecoration: 'none' }}
-              >
+              <Link key={medicine._id} to={`/medicines/${medicine._id}`} style={{ textDecoration: 'none' }}>
                 <div className="card medicine-card">
                   <div className="card-body">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.5rem' }}>
                       <span className="badge badge-primary">{medicine.category}</span>
-                      {medicine.prescriptionRequired && (
-                        <span className="badge badge-warning">Rx</span>
-                      )}
+                      {medicine.prescriptionRequired && <span className="badge badge-warning">Rx</span>}
                     </div>
                     <h3 className="medicine-name">{medicine.name}</h3>
-                    {medicine.genericName && (
-                      <p className="medicine-generic">{medicine.genericName}</p>
-                    )}
+                    {medicine.genericName && <p className="medicine-generic">{medicine.genericName}</p>}
                     <p className="text-sm text-muted mb-2">{medicine.manufacturer}</p>
                     <p className="text-sm text-muted mb-3">{medicine.dosageForm} - {medicine.strength}</p>
                     <div style={{ display: 'flex', alignItems: 'baseline' }}>
@@ -169,45 +168,21 @@ const SearchMedicines = () => {
               </Link>
             ))}
           </div>
-
-          {/* Pagination */}
           {pagination.pages > 1 && (
             <div className="pagination">
-              <button
-                className="pagination-btn"
-                disabled={pagination.current === 1}
-                onClick={() => handlePageChange(pagination.current - 1)}
-              >
-                Previous
-              </button>
-              
+              <button className="pagination-btn" disabled={pagination.current === 1} onClick={() => handlePageChange(pagination.current - 1)}>Previous</button>
               {[...Array(pagination.pages)].map((_, i) => (
-                <button
-                  key={i + 1}
-                  className={`pagination-btn ${pagination.current === i + 1 ? 'active' : ''}`}
-                  onClick={() => handlePageChange(i + 1)}
-                >
-                  {i + 1}
-                </button>
+                <button key={i + 1} className={`pagination-btn ${pagination.current === i + 1 ? 'active' : ''}`} onClick={() => handlePageChange(i + 1)}>{i + 1}</button>
               ))}
-              
-              <button
-                className="pagination-btn"
-                disabled={pagination.current === pagination.pages}
-                onClick={() => handlePageChange(pagination.current + 1)}
-              >
-                Next
-              </button>
+              <button className="pagination-btn" disabled={pagination.current === pagination.pages} onClick={() => handlePageChange(pagination.current + 1)}>Next</button>
             </div>
           )}
         </>
-      ) : (
+      ) : !loading && (
         <div className="empty-state">
           <div className="empty-state-icon">💊</div>
           <h3 className="empty-state-title">No medicines found</h3>
-          <p className="empty-state-text">
-            Try adjusting your search or filters to find what you are looking for
-          </p>
+          <p className="empty-state-text">Try adjusting your search or filters to find what you are looking for</p>
         </div>
       )}
     </div>

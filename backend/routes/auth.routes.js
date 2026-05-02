@@ -1,4 +1,5 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   register,
   login,
@@ -12,10 +13,22 @@ import { authMiddleware } from '../middleware/auth.middleware.js';
 import { registerValidation, loginValidation, validate } from '../middleware/validation.middleware.js';
 
 const router = express.Router();
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minute window
+  max: 10,                    // max 10 attempts per window per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many attempts from this IP. Please try again after 15 minutes.'
+  },
+  // Skip rate limiting in tests
+  skip: (req) => process.env.NODE_ENV === 'test'
+});
 
 // Public routes
-router.post('/register', registerValidation, validate, register);
-router.post('/login', loginValidation, validate, login);
+router.post('/register', authLimiter, registerValidation, validate, register);
+router.post('/login', authLimiter, loginValidation, validate, login);
 router.post('/refresh-token', refreshToken);
 
 // Protected routes

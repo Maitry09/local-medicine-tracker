@@ -30,6 +30,7 @@ import PharmacyDashboard from './pages/pharmacy/PharmacyDashboard';
 import ManageStock from './pages/pharmacy/PharmacyStock';
 import PharmacyOrders from './pages/pharmacy/PharmacyOrders';
 import PharmacyProfile from './pages/pharmacy/PharmacyProfile';
+import PharmacyAnalytics from './pages/pharmacy/PharmacyAnalytics';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -41,9 +42,25 @@ import AdminOrders from './pages/admin/AdminOrders';
 // Components
 import ProtectedRoute from './components/ProtectedRoute';
 
-function App() {
+function RootRedirect() {
   const { user, loading } = useAuth();
+  if (loading) return (
+    <div className="loading-screen">
+      <div className="spinner"></div>
+      <p>Loading...</p>
+    </div>
+  );
+  if (!user) return <Home />;
+  if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
+  if (user.role === 'pharmacy') return <Navigate to="/pharmacy/dashboard" replace />;
+  return <Navigate to="/dashboard" replace />;
+}
 
+function App() {
+  const { loading, user } = useAuth();
+
+  // Only block render during initial auth check (not on navigation)
+  // loading is false immediately if no token exists (sync init)
   if (loading) {
     return (
       <div className="loading-screen">
@@ -57,7 +74,7 @@ function App() {
     <Routes>
       {/* Public Routes */}
       <Route element={<MainLayout />}>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<RootRedirect />} />
         <Route path="/search" element={<SearchMedicines />} />
         <Route path="/medicines/:id" element={<MedicineDetails />} />
         <Route path="/pharmacies" element={<PharmacyList />} />
@@ -66,8 +83,8 @@ function App() {
 
       {/* Auth Routes */}
       <Route element={<AuthLayout />}>
-        <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
-        <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
+        <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+        <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
       </Route>
 
       {/* Patient Routes */}
@@ -88,6 +105,7 @@ function App() {
       <Route element={<ProtectedRoute allowedRoles={['pharmacy', 'admin']} />}>
         <Route element={<DashboardLayout />}>
           <Route path="/pharmacy/dashboard" element={<PharmacyDashboard />} />
+          <Route path="/pharmacy/analytics" element={<PharmacyAnalytics />} />
           <Route path="/pharmacy/stock" element={<ManageStock />} />
           <Route path="/pharmacy/orders" element={<PharmacyOrders />} />
           <Route path="/pharmacy/profile" element={<PharmacyProfile />} />
@@ -105,7 +123,7 @@ function App() {
         </Route>
       </Route>
 
-      {/* 404 Route */}
+      {/* 404 */}
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
