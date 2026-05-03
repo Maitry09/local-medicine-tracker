@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 
 const connectDB = async () => {
-  // FIXED: Fail fast if env variable is missing — no silent fallback
   const mongoURI = process.env.MONGODB_URI;
 
   if (!mongoURI) {

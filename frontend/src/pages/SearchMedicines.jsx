@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { useState, useEffect, useRef } from 'react';
-=======
-import { useState, useEffect, useCallback } from 'react';
->>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
 import { Link, useSearchParams } from 'react-router-dom';
 import { medicineAPI } from '../services/api';
 
@@ -14,31 +10,20 @@ const SearchMedicines = () => {
   const [error, setError] = useState('');
   const [pagination, setPagination] = useState({ current: 1, pages: 1, total: 0 });
 
-<<<<<<< HEAD
-=======
-  // Keep filters as individual pieces of state — avoids object-reference dep issues
->>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
   const [query, setQuery] = useState(searchParams.get('q') || '');
   const [category, setCategory] = useState(searchParams.get('category') || '');
   const [prescription, setPrescription] = useState(searchParams.get('prescription') || '');
   const [page, setPage] = useState(parseInt(searchParams.get('page')) || 1);
 
-<<<<<<< HEAD
   // Debounce query
-=======
-  // Debounce only the text query — other filters apply immediately
->>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
   const [debouncedQuery, setDebouncedQuery] = useState(query);
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query), 350);
     return () => clearTimeout(t);
   }, [query]);
-<<<<<<< HEAD
 
   // Track mount to always fetch on mount (fixes back-navigation stale state)
   const mountedRef = useRef(false);
-=======
->>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
 
   useEffect(() => {
     medicineAPI.getCategories()
@@ -46,7 +31,6 @@ const SearchMedicines = () => {
       .catch(() => {});
   }, []);
 
-<<<<<<< HEAD
   useEffect(() => {
     let cancelled = false;
 
@@ -86,55 +70,6 @@ const SearchMedicines = () => {
 
   const handleCategoryChange = (val) => { setCategory(val); setPage(1); };
   const handlePrescriptionChange = (val) => { setPrescription(val); setPage(1); };
-=======
-  // FIXED: depend on individual primitives, not an object — no infinite loop
-  const fetchMedicines = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = { page, limit: 12 };
-      if (debouncedQuery) params.q = debouncedQuery;
-      if (category) params.category = category;
-      if (prescription) params.prescriptionRequired = prescription;
-
-      const response = await medicineAPI.search(params);
-      setMedicines(response.data.data.medicines || []);
-      setPagination(response.data.data.pagination || { current: 1, pages: 1, total: 0 });
-
-      // Sync URL without triggering another render
-      const newParams = new URLSearchParams();
-      if (debouncedQuery) newParams.set('q', debouncedQuery);
-      if (category) newParams.set('category', category);
-      if (page > 1) newParams.set('page', page);
-      setSearchParams(newParams, { replace: true });
-    } catch (err) {
-      setError('Failed to fetch medicines. Please check your connection and try again.');
-      setMedicines([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [debouncedQuery, category, prescription, page, setSearchParams]); // primitives only — safe
-
-  useEffect(() => {
-    fetchMedicines();
-  }, [fetchMedicines]);
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setPage(1); // reset to first page on new search
-  };
-
-  const handleCategoryChange = (val) => {
-    setCategory(val);
-    setPage(1);
-  };
-
-  const handlePrescriptionChange = (val) => {
-    setPrescription(val);
-    setPage(1);
-  };
-
->>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
   const handlePageChange = (newPage) => {
     setPage(newPage);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -166,7 +101,6 @@ const SearchMedicines = () => {
 
       <div className="card mb-4">
         <div className="card-body">
-<<<<<<< HEAD
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 300px' }}>
               <input
@@ -176,45 +110,6 @@ const SearchMedicines = () => {
                 value={query}
                 onChange={(e) => { setQuery(e.target.value); setPage(1); }}
               />
-=======
-          <form onSubmit={handleSearch}>
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-              <div style={{ flex: '1 1 300px' }}>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Search by medicine name..."
-                  value={query}
-                  onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-                />
-              </div>
-              <div style={{ flex: '0 1 200px' }}>
-                <select
-                  className="form-select"
-                  value={category}
-                  onChange={(e) => handleCategoryChange(e.target.value)}
-                >
-                  <option value="">All Categories</option>
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ flex: '0 1 180px' }}>
-                <select
-                  className="form-select"
-                  value={prescription}
-                  onChange={(e) => handlePrescriptionChange(e.target.value)}
-                >
-                  <option value="">All Medicines</option>
-                  <option value="false">OTC Only</option>
-                  <option value="true">Prescription Only</option>
-                </select>
-              </div>
-              <button type="submit" className="btn btn-primary">
-                Search
-              </button>
->>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
             </div>
             <div style={{ flex: '0 1 200px' }}>
               <select className="form-select" value={category} onChange={(e) => handleCategoryChange(e.target.value)}>
@@ -233,7 +128,6 @@ const SearchMedicines = () => {
         </div>
       </div>
 
-<<<<<<< HEAD
       {error && (
         <div className="alert alert-danger" style={{ marginBottom: '1rem' }}>
           {error}
@@ -241,19 +135,6 @@ const SearchMedicines = () => {
         </div>
       )}
 
-=======
-      {/* Error state */}
-      {error && (
-        <div className="alert alert-danger" style={{ marginBottom: '1rem' }}>
-          {error}
-          <button onClick={fetchMedicines} style={{ marginLeft: '1rem' }} className="btn btn-sm btn-outline">
-            Retry
-          </button>
-        </div>
-      )}
-
-      {/* Results */}
->>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
       {loading ? (
         <div className="text-center" style={{ padding: '3rem' }}>
           <div className="spinner"></div>

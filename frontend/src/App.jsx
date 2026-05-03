@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-import { useState, useEffect } from 'react';
 
 // Layouts
 import MainLayout from './layouts/MainLayout';
@@ -43,30 +42,10 @@ import AdminOrders from './pages/admin/AdminOrders';
 // Components
 import ProtectedRoute from './components/ProtectedRoute';
 
-<<<<<<< HEAD
 function RootRedirect() {
   const { user, loading } = useAuth();
-  if (loading) return (
-    <div className="loading-screen">
-      <div className="spinner"></div>
-      <p>Loading...</p>
-    </div>
-  );
-  if (!user) return <Home />;
-  if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
-  if (user.role === 'pharmacy') return <Navigate to="/pharmacy/dashboard" replace />;
-  return <Navigate to="/dashboard" replace />;
-}
-
-function App() {
-  const { loading, user } = useAuth();
-
-  // Only block render during initial auth check (not on navigation)
-  // loading is false immediately if no token exists (sync init)
-=======
-function App() {
-  const { user, loading } = useAuth();  
->>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
+  
+  // Show loading while checking auth status
   if (loading) {
     return (
       <div className="loading-screen">
@@ -75,46 +54,40 @@ function App() {
       </div>
     );
   }
+  
+  // If no user, show home page
+  if (!user) {
+    return <Home />;
+  }
+  
+  // Redirect based on user role
+  if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
+  if (user.role === 'pharmacy') return <Navigate to="/pharmacy/dashboard" replace />;
+  return <Navigate to="/dashboard" replace />;
+}
 
+// FIXED: AuthRedirect component to handle user check properly
+function AuthRedirect({ children }) {
+  const { user } = useAuth();
+  return user ? <Navigate to="/" replace /> : children;
+}
+
+function App() {
   return (
-    <Routes >
+    <Routes>
       {/* Public Routes */}
       <Route element={<MainLayout />}>
-<<<<<<< HEAD
         <Route path="/" element={<RootRedirect />} />
-=======
-        <Route
-          path="/"
-          element={
-            user && !loading ? (
-              user.role === 'admin' ? (
-                <Navigate to="/admin/dashboard" replace />
-              ) : user.role === 'pharmacy' ? (
-                <Navigate to="/pharmacy/dashboard" replace />
-              ) : (
-                <Navigate to="/dashboard" replace />
-              )
-            ) : !loading ? (
-              <Home />
-            ) : (
-              <div className="loading-screen">
-                <div className="spinner"></div>
-                <p>Loading...</p>
-              </div>
-            )
-          }
-        />
->>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
         <Route path="/search" element={<SearchMedicines />} />
         <Route path="/medicines/:id" element={<MedicineDetails />} />
         <Route path="/pharmacies" element={<PharmacyList />} />
         <Route path="/pharmacies/:id" element={<PharmacyDetails />} />
       </Route>
 
-      {/* Auth Routes */}
+      {/* Auth Routes - FIXED */}
       <Route element={<AuthLayout />}>
-        <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
-        <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
+        <Route path="/login" element={<AuthRedirect><Login /></AuthRedirect>} />
+        <Route path="/register" element={<AuthRedirect><Register /></AuthRedirect>} />
       </Route>
 
       {/* Patient Routes */}

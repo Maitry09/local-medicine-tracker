@@ -1,193 +1,243 @@
-import { useState, useEffect } from 'react';
-import { orderAPI, pharmacyAPI } from '../../services/api';
-import { useNotification } from '../../context/NotificationContext';
+import { useState, useEffect, useMemo } from 'react';
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
+} from 'recharts';
+import { orderAPI, stockAPI } from '../../services/api';
 
-const PharmacyAnalytics = () => {
-  const [analytics, setAnalytics] = useState({
-    totalRevenue: 0,
-    totalOrders: 0,
-    averageOrderValue: 0,
-    topMedicines: [],
-    orderTrend: [],
-    revenueByStatus: {},
-  });
+const COLORS = ['#1976d2', '#2e7d32', '#f57c00', '#c62828', '#7b1fa2', '#00796b'];
+
+function StatCard({ title, value, sub, color = '#1976d2', icon }) {
+  return (
+    <div className="card" style={{ flex: '1 1 180px' }}>
+      <div className="card-body" style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 32 }}>{icon}</div>
+        <div style={{ fontSize: 28, fontWeight: 700, color, margin: '8px 0 4px' }}>{value}</div>
+        <div style={{ fontWeight: 600, color: '#333' }}>{title}</div>
+        {sub && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+export default function PharmacyAnalytics() {
+  const [orders, setOrders] = useState([]);
+  const [stock, setStock] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { showNotification } = useNotification();
+  const [period, setPeriod] = useState(30); // days
 
   useEffect(() => {
-    fetchAnalytics();
+    (async () => {
+      try {
+        const [ordersRes, stockRes] = await Promise.all([
+          orderAPI.getPharmacyOrders({ limit: 1000 }),
+          stockAPI.getMyStock({ limit: 500 })
+        ]);
+        setOrders(ordersRes.data.data?.orders || []);
+        setStock(stockRes.data.data?.stock || []);
+      } catch (e) { console.error(e); }
+      finally { setLoading(false); }
+    })();
   }, []);
 
-  const fetchAnalytics = async () => {
-    try {
-      console.log('🔄 Fetching analytics data...');
-      const [ordersRes, stockRes] = await Promise.all([
-        orderAPI.getPharmacyOrders({ limit: 1000 }),
-        pharmacyAPI.getMyPharmacyStock(),
-      ]);
+  const analytics = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - period);
 
-      console.log('📊 Orders response:', ordersRes.data);
-      console.log('📦 Stock response:', stockRes.data);
+    const periodOrders = orders.filter(o => new Date(o.createdAt) >= cutoff);
+    const paidOrders = periodOrders.filter(o => o.paymentStatus === 'paid');
+    const totalRevenue = paidOrders.reduce((s, o) => s + (o.totalAmount || o.total || 0), 0);
+    const avgOrderValue = paidOrders.length ? totalRevenue / paidOrders.length : 0;
 
-      const orders = ordersRes.data.orders || [];
-<<<<<<< HEAD
-      const stocks = stockRes.data.stocks || [];
-=======
-      const stocks = stockRes.data.data?.stocks || [];
->>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
+    // Revenue by day
+    const revenueByDay = {};
+    paidOrders.forEach(o => {
+      const day = new Date(o.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+      revenueByDay[day] = (revenueByDay[day] || 0) + (o.totalAmount || o.total || 0);
+    });
+    const revenueTrend = Object.entries(revenueByDay)
+      .map(([date, revenue]) => ({ date, revenue: Math.round(revenue) }))
+      .slice(-14);
 
-      // Calculate analytics
-      const totalRevenue = orders
-        .filter((o) => o.paymentStatus === 'paid')
-        .reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    // Order status breakdown
+    const statusCount = {};
+    periodOrders.forEach(o => { statusCount[o.status] = (statusCount[o.status] || 0) + 1; });
+    const statusData = Object.entries(statusCount).map(([name, value]) => ({ name, value }));
 
-      const averageOrderValue = orders.length > 0 ? totalRevenue / orders.length : 0;
-
-      // Top medicines by quantity sold
-      const medicineMap = {};
-<<<<<<< HEAD
-      orders.forEach((order) => {
-        if (order.items && Array.isArray(order.items)) {
-          order.items.forEach((item) => {
-            const key = item.medicineId || item.medicine?._id;
-            if (key) {
-              medicineMap[key] = (medicineMap[key] || 0) + (item.quantity || 0);
-=======
-            orders.forEach((order) => {
-        if (order.items && Array.isArray(order.items)) {
-          order.items.forEach((item) => {
-            const key = item.medicineId || item.medicine?._id;
-            const name = item.medicine?.name || item.medicineName || key; // ← capture name
-            if (key) {
-              if (!medicineMap[key]) medicineMap[key] = { quantity: 0, name };
-              medicineMap[key].quantity += (item.quantity || 0);
->>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
-            }
-          });
-        }
+    // Top medicines
+    const medicineRevenue = {};
+    paidOrders.forEach(o => {
+      (o.items || []).forEach(item => {
+        const name = item.medicine?.name || 'Unknown';
+        if (!medicineRevenue[name]) medicineRevenue[name] = { name, revenue: 0, units: 0 };
+        medicineRevenue[name].revenue += (item.price || 0) * (item.quantity || 1);
+        medicineRevenue[name].units += item.quantity || 1;
       });
+    });
+    const topMedicines = Object.values(medicineRevenue)
+      .sort((a, b) => b.revenue - a.revenue).slice(0, 8);
 
-      const topMedicines = Object.entries(medicineMap)
-<<<<<<< HEAD
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 5)
-        .map(([id, qty]) => ({ medicineId: id, quantity: qty }));
-=======
-        .sort(([, a], [, b]) => b.quantity - a.quantity)
-        .slice(0, 5)
-        .map(([id, { quantity, name }]) => ({ medicineId: id, name, quantity }));
->>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
+    // Low stock (< 10 units)
+    const now = new Date();
+    const lowStock = stock.filter(s => s.quantity > 0 && s.quantity < 10);
+    const expiringSoon = stock.filter(s => {
+      if (!s.expiryDate) return false;
+      const daysLeft = (new Date(s.expiryDate) - now) / (1000 * 60 * 60 * 24);
+      return daysLeft <= 30 && daysLeft > 0;
+    });
+    const outOfStock = stock.filter(s => s.quantity === 0);
 
-      // Revenue by order status
-      const revenueByStatus = {};
-      orders.forEach((order) => {
-        const status = order.status || 'unknown';
-        if (!revenueByStatus[status]) {
-          revenueByStatus[status] = 0;
-        }
-        revenueByStatus[status] += order.totalAmount || 0;
-      });
+    return { totalRevenue, avgOrderValue, paidOrders, periodOrders, revenueTrend, statusData, topMedicines, lowStock, expiringSoon, outOfStock };
+  }, [orders, stock, period]);
 
-      const analyticsData = {
-        totalRevenue,
-        totalOrders: orders.length,
-        averageOrderValue: parseFloat(averageOrderValue.toFixed(2)),
-        topMedicines,
-        stocks,
-        revenueByStatus,
-      };
-
-      console.log('✅ Analytics calculated:', analyticsData);
-      setAnalytics(analyticsData);
-    } catch (error) {
-      console.error('❌ Failed to fetch analytics:', error);
-      showNotification('Failed to load analytics data', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <div style={{ width: '40px', height: '40px', border: '4px solid #f0f0f0', borderTop: '4px solid #1976d2', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 20px' }}></div>
-        <p>Loading analytics...</p>
-      </div>
-    );
-  }
+  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}><div className="spinner" /></div>;
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ marginBottom: '20px' }}>
-        <h1>Pharmacy Analytics</h1>
-        <p>Track your pharmacy performance and sales metrics</p>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '30px' }}>
-        <div style={{ background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '20px' }}>
-          <h3>Total Revenue</h3>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: '10px 0' }}>Rs. {analytics.totalRevenue.toFixed(2)}</p>
-        </div>
-
-        <div style={{ background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '20px' }}>
-          <h3>Total Orders</h3>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: '10px 0' }}>{analytics.totalOrders}</p>
-        </div>
-
-        <div style={{ background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '20px' }}>
-          <h3>Average Order Value</h3>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: '10px 0' }}>Rs. {analytics.averageOrderValue.toFixed(2)}</p>
-        </div>
-
-        <div style={{ background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '20px' }}>
-          <h3>Stock Items</h3>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: '10px 0' }}>{analytics.stocks?.length || 0}</p>
-        </div>
-      </div>
-
-      <div style={{ background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '20px', marginBottom: '20px' }}>
-        <h2>Revenue by Order Status</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' }}>
-          {Object.entries(analytics.revenueByStatus).map(([status, revenue]) => (
-            <div key={status} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 120px', gap: '10px', alignItems: 'center' }}>
-              <span style={{ fontWeight: '500' }}>{status.charAt(0).toUpperCase() + status.slice(1)}</span>
-              <div style={{ background: '#f0f0f0', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
-                <div
-                  style={{
-                    background: '#1976d2',
-                    height: '100%',
-                    borderRadius: '4px',
-                    width: `${analytics.totalRevenue > 0 ? (revenue / analytics.totalRevenue) * 100 : 0}%`,
-                    transition: 'width 0.3s ease',
-                  }}
-                />
-              </div>
-              <span style={{ textAlign: 'right', fontWeight: '500' }}>Rs. {revenue.toFixed(2)}</span>
-            </div>
+    <div style={{ padding: '1.5rem' }}>
+      {/* Header + Period Selector */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+        <h2 style={{ margin: 0 }}>Analytics Dashboard</h2>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {[7, 30, 90].map(d => (
+            <button key={d} onClick={() => setPeriod(d)}
+              className={`btn btn-sm ${period === d ? 'btn-primary' : 'btn-outline'}`}>
+              {d}d
+            </button>
           ))}
         </div>
       </div>
 
-      {analytics.topMedicines?.length > 0 && (
-        <div style={{ background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '20px' }}>
-          <h2>Top Selling Medicines</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' }}>
-            {analytics.topMedicines.map((medicine, index) => (
-              <div key={index} style={{ display: 'grid', gridTemplateColumns: '50px 1fr 100px', gap: '10px', alignItems: 'center', padding: '10px', background: '#f9f9f9', borderRadius: '6px' }}>
-                <span style={{ fontWeight: '600', color: '#1976d2' }}>#{index + 1}</span>
-<<<<<<< HEAD
-                <span style={{ fontWeight: '500' }}>{medicine.medicineId}</span>
-=======
-                <span style={{ fontWeight: '500' }}>{medicine.name}</span>
->>>>>>> 7928981f7cd32b1b5fdaca113a3eea08909ad7ca
-                <span style={{ textAlign: 'right', color: '#666' }}>Qty: {medicine.quantity}</span>
-              </div>
-            ))}
+      {/* Stat Cards */}
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+        <StatCard icon="💰" title="Revenue" value={`₹${analytics.totalRevenue.toLocaleString('en-IN')}`} sub={`last ${period} days`} color="#1976d2" />
+        <StatCard icon="📦" title="Total Orders" value={analytics.periodOrders.length} sub={`${analytics.paidOrders.length} paid`} color="#2e7d32" />
+        <StatCard icon="🧾" title="Avg Order Value" value={`₹${analytics.avgOrderValue.toFixed(0)}`} color="#f57c00" />
+        <StatCard icon="⚠️" title="Low Stock Items" value={analytics.lowStock.length} sub="< 10 units" color="#c62828" />
+        <StatCard icon="📅" title="Expiring ≤30d" value={analytics.expiringSoon.length} sub="items" color="#7b1fa2" />
+        <StatCard icon="❌" title="Out of Stock" value={analytics.outOfStock.length} sub="items" color="#999" />
+      </div>
+
+      {/* Revenue Trend */}
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <div className="card-body">
+          <h3 style={{ marginBottom: '1rem' }}>Revenue Trend</h3>
+          {analytics.revenueTrend.length === 0 ? (
+            <p className="text-muted">No paid orders in this period.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={analytics.revenueTrend} margin={{ left: 10, right: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `₹${v}`} />
+                <Tooltip formatter={v => [`₹${v}`, 'Revenue']} />
+                <Line type="monotone" dataKey="revenue" stroke="#1976d2" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+        {/* Top Medicines */}
+        <div className="card">
+          <div className="card-body">
+            <h3 style={{ marginBottom: '1rem' }}>Top Medicines by Revenue</h3>
+            {analytics.topMedicines.length === 0 ? (
+              <p className="text-muted">No data.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={analytics.topMedicines} layout="vertical" margin={{ left: 60, right: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" tickFormatter={v => `₹${v}`} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={60} />
+                  <Tooltip formatter={v => [`₹${v}`, 'Revenue']} />
+                  <Bar dataKey="revenue" fill="#1976d2" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
+        </div>
+
+        {/* Order Status Pie */}
+        <div className="card">
+          <div className="card-body">
+            <h3 style={{ marginBottom: '1rem' }}>Order Status Breakdown</h3>
+            {analytics.statusData.length === 0 ? (
+              <p className="text-muted">No orders in this period.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie data={analytics.statusData} dataKey="value" nameKey="name"
+                    cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}>
+                    {analytics.statusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Low Stock & Expiry Warning Tables */}
+      {(analytics.lowStock.length > 0 || analytics.expiringSoon.length > 0) && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem' }}>
+          {analytics.lowStock.length > 0 && (
+            <div className="card" style={{ border: '1px solid #ffcdd2' }}>
+              <div className="card-body">
+                <h3 style={{ color: '#c62828', marginBottom: '1rem' }}>⚠️ Low Stock Warning</h3>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#fff8f8' }}>
+                      <th style={{ padding: '8px', textAlign: 'left' }}>Medicine</th>
+                      <th style={{ padding: '8px', textAlign: 'right' }}>Units Left</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.lowStock.slice(0, 10).map((s, i) => (
+                      <tr key={i} style={{ borderTop: '1px solid #f5f5f5' }}>
+                        <td style={{ padding: '8px' }}>{s.medicine?.name || 'Unknown'}</td>
+                        <td style={{ padding: '8px', textAlign: 'right', fontWeight: 700, color: s.quantity <= 5 ? '#c62828' : '#f57c00' }}>
+                          {s.quantity}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {analytics.expiringSoon.length > 0 && (
+            <div className="card" style={{ border: '1px solid #ffe0b2' }}>
+              <div className="card-body">
+                <h3 style={{ color: '#e65100', marginBottom: '1rem' }}>📅 Expiring Within 30 Days</h3>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#fffde7' }}>
+                      <th style={{ padding: '8px', textAlign: 'left' }}>Medicine</th>
+                      <th style={{ padding: '8px', textAlign: 'right' }}>Expiry</th>
+                      <th style={{ padding: '8px', textAlign: 'right' }}>Units</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.expiringSoon.slice(0, 10).map((s, i) => (
+                      <tr key={i} style={{ borderTop: '1px solid #f5f5f5' }}>
+                        <td style={{ padding: '8px' }}>{s.medicine?.name || 'Unknown'}</td>
+                        <td style={{ padding: '8px', textAlign: 'right', color: '#e65100' }}>
+                          {new Date(s.expiryDate).toLocaleDateString('en-IN')}
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'right' }}>{s.quantity}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
-};
-
-export default PharmacyAnalytics;
+}

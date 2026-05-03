@@ -14,7 +14,7 @@ export const useCart = () => {
 
 export const CartProvider = ({ children }) => {
 
-  // FIXED: Initialize cart from localStorage so it survives page refresh
+  // Initialize cart from localStorage so it survives page refresh
   const [cartItems, setCartItems] = useState(() => {
     try {
       const saved = localStorage.getItem(CART_STORAGE_KEY);
@@ -26,7 +26,7 @@ export const CartProvider = ({ children }) => {
     }
   });
 
-  // FIXED: Persist cart to localStorage whenever it changes
+  // Persist cart to localStorage whenever it changes
   useEffect(() => {
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
@@ -110,6 +110,9 @@ export const CartProvider = ({ children }) => {
   };
 
   const getTotalItems = () => cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  
+  // FIXED: Add getItemCount as an alias for getTotalItems for backward compatibility
+  const getItemCount = getTotalItems;
 
   return (
     <CartContext.Provider value={{
@@ -120,7 +123,8 @@ export const CartProvider = ({ children }) => {
       clearCart,
       getCartTotal,
       getItemsByPharmacy,
-      getTotalItems
+      getTotalItems,
+      getItemCount  // FIXED: Export getItemCount
     }}>
       {children}
     </CartContext.Provider>

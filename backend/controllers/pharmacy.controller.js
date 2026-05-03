@@ -34,52 +34,72 @@ export const getAllPharmacies = asyncHandler(async (req, res) => {
   let total;
 
   if (lat && lng) {
-    // FIXED: Use MongoDB $nearSphere — uses the 2dsphere index, returns pre-sorted by distance
-    // IMPORTANT: MongoDB GeoJSON uses [longitude, latitude] order
+    // FIXED: Use aggregation with $geoNear for proper geospatial queries
+    // $geoNear must be the FIRST stage in aggregation pipeline
     const userLng = parseFloat(lng);
     const userLat = parseFloat(lat);
     const maxDistanceMeters = parseFloat(radius) * 1000; // convert km to meters
 
-    // $nearSphere automatically sorts by distance ascending
-    const geoQuery = {
-      ...query,
-      'address.location': {
-        $nearSphere: {
-          $geometry: {
+    // Build match stage for additional filters
+    const matchStage = { isActive: true };
+    if (city) matchStage['address.city'] = { $regex: city, $options: 'i' };
+    if (isVerified !== undefined) matchStage.isVerified = isVerified === 'true';
+    if (is24Hours !== undefined) matchStage['operatingHours.is24Hours'] = is24Hours === 'true';
+    if (search) {
+      matchStage.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { 'address.city': { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const pipeline = [
+      {
+        $geoNear: {
+          near: {
             type: 'Point',
-            coordinates: [userLng, userLat]  // [lng, lat] — MongoDB order!
+            coordinates: [userLng, userLat]  // [lng, lat] — MongoDB GeoJSON order
           },
-          $maxDistance: maxDistanceMeters
+          distanceField: 'distance',  // Distance in meters
+          maxDistance: maxDistanceMeters,
+          spherical: true,
+          key: 'address.location'
+        }
+      },
+      // Apply additional filters after $geoNear
+      { $match: matchStage },
+      // Lookup owner information
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'owner',
+          foreignField: '_id',
+          as: 'owner',
+          pipeline: [
+            { $project: { name: 1, email: 1, phone: 1 } }
+          ]
+        }
+      },
+      { $unwind: '$owner' },
+      // Facet for pagination and count
+      {
+        $facet: {
+          pharmacies: [
+            { $skip: (parseInt(page) - 1) * parseInt(limit) },
+            { $limit: parseInt(limit) }
+          ],
+          totalCount: [{ $count: 'count' }]
         }
       }
-    };
+    ];
 
-    // $nearSphere does not support .count() directly, so we run both
-    [pharmacies, total] = await Promise.all([
-      Pharmacy.find(geoQuery)
-        .populate('owner', 'name email phone')
-        .skip((page - 1) * parseInt(limit))
-        .limit(parseInt(limit)),
-      Pharmacy.countDocuments(geoQuery)
-    ]);
-
-    // Calculate and attach distance for display (MongoDB doesn't return it with find())
-    pharmacies = pharmacies.map(pharmacy => {
-      const p = pharmacy.toObject();
-      const pharmacyLng = pharmacy.address.coordinates.lng;
-      const pharmacyLat = pharmacy.address.coordinates.lat;
-
-      // Haversine for display only — query already filtered by distance
-      const R = 6371;
-      const dLat = (pharmacyLat - userLat) * Math.PI / 180;
-      const dLng = (pharmacyLng - userLng) * Math.PI / 180;
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(userLat * Math.PI / 180) * Math.cos(pharmacyLat * Math.PI / 180) *
-        Math.sin(dLng / 2) ** 2;
-      p.distance = Math.round(2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * R * 10) / 10;
-      return p;
-    });
+    const [result] = await Pharmacy.aggregate(pipeline);
+    
+    pharmacies = result.pharmacies.map(p => ({
+      ...p,
+      distance: Math.round(p.distance / 100) / 10  // Convert meters to km with 1 decimal
+    }));
+    
+    total = result.totalCount[0]?.count || 0;
 
   } else {
     // No location filter — standard query sorted by rating
@@ -123,7 +143,7 @@ export const getPharmacyStock = asyncHandler(async (req, res) => {
   const pharmacy = await Pharmacy.findById(req.params.id);
   if (!pharmacy) return sendError(res, 404, 'Pharmacy not found');
 
-  // FIXED: Filter before paginating using aggregation
+  // Filter before paginating using aggregation
   const pipeline = [
     { $match: { pharmacy: pharmacy._id } },
     {
