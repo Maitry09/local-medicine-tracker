@@ -25,7 +25,7 @@ export const authMiddleware = async (req, res, next) => {
     }
 
     // Get user from database
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById(decoded.userId).populate('pharmacyId');
     
     if (!user) {
       logger.debug('User not found for token');

@@ -3,9 +3,11 @@ import crypto from 'crypto';
 import Order from '../models/Order.js';
 import Payment from '../models/Payment.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
+import dotenv from 'dotenv';
 
 // Initialize Razorpay instance
 let razorpay;
+dotenv.config();
 
 try {
   razorpay = new Razorpay({

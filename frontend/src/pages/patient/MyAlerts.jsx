@@ -14,7 +14,7 @@ export default function MyAlerts() {
   const fetchAlerts = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/alerts/my-alerts');
+      const response = await api.get('/alerts');
       let filteredAlerts = response.data.data.alerts || [];
       
       if (filter === 'active') {

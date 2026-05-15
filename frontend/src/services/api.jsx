@@ -4,31 +4,18 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Create axios instance
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  baseURL: 'http://localhost:5000/api'
 });
 
-// Request interceptor - add auth token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    console.log('📤 API Request:', {
-      method: config.method.toUpperCase(),
-      url: config.url,
-      hasAuth: !!token
-    });
-    return config;
-  },
-  (error) => {
-    console.error('❌ Request interceptor error:', error);
-    return Promise.reject(error);
+api.interceptors.request.use((req) => {
+  const token = localStorage.getItem('token');
+
+  if (token) {
+    req.headers.Authorization = `Bearer ${token}`;
   }
-);
+
+  return req;
+});
 
 // Response interceptor - handle token refresh
 api.interceptors.response.use(

@@ -1,89 +1,104 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI } from '../services/api';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState
+} from 'react';
 
-const AuthContext = createContext(null);
+import api, { authAPI } from '../services/api';
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within an AuthProvider');
-  return context;
-};
+const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    // Initialize from localStorage synchronously so no blank flash
-    try {
-      const saved = localStorage.getItem('user');
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
-  const [loading, setLoading] = useState(() => !!localStorage.getItem('accessToken'));
+  const [user, setUser] = useState(null);
 
+  const [token, setToken] = useState(
+    localStorage.getItem('token')
+  );
+
+  const [loading, setLoading] = useState(true);
+
+  // LOAD CURRENT USER
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) { setLoading(false); return; }
-
-    // Silently verify token in background
-    authAPI.getMe()
-      .then(res => {
-        const freshUser = res.data.data.user;
-        setUser(freshUser);
-        localStorage.setItem('user', JSON.stringify(freshUser));
-      })
-      .catch(err => {
-        if (err.response?.status === 401) {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
-          setUser(null);
+    const loadUser = async () => {
+      try {
+        if (!token) {
+          setLoading(false);
+          return;
         }
-      })
-      .finally(() => setLoading(false));
-  }, []);
 
+        const res = await api.get('/auth/me');
+
+        setUser(res.data.data.user);
+      } catch (err) {
+        console.log('Auth Error:', err);
+
+        localStorage.removeItem('token');
+
+        setToken(null);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUser();
+  }, [token]);
+
+  // LOGIN
   const login = async (email, password) => {
-    const response = await authAPI.login({ email, password });
-    const { user, accessToken, refreshToken } = response.data.data;
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
-    localStorage.setItem('user', JSON.stringify(user));
-    setUser(user);
-    return user;
+    try {
+      const response = await authAPI.login({
+        email,
+        password
+      });
+
+      const data = response.data.data;
+
+      // save token
+      localStorage.setItem(
+        'token',
+        data.accessToken
+      );
+
+      // update state
+      setToken(data.accessToken);
+
+      setUser(data.user);
+
+      return data.user;
+    } catch (error) {
+      throw error;
+    }
   };
 
-  const register = async (userData) => {
-    const response = await authAPI.register(userData);
-    const { user, accessToken, refreshToken } = response.data.data;
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
-    localStorage.setItem('user', JSON.stringify(user));
-    setUser(user);
-    return user;
-  };
+  // LOGOUT
+  const logout = () => {
+    localStorage.removeItem('token');
 
-  const logout = async () => {
-    try { await authAPI.logout(); } catch {}
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
+    setToken(null);
     setUser(null);
   };
 
-  const updateUser = (updatedUser) => {
-    setUser(updatedUser);
-    localStorage.setItem('user', JSON.stringify(updatedUser));
-  };
-
   return (
-    <AuthContext.Provider value={{
-      user, loading,
-      login, register, logout, updateUser,
-      isAuthenticated: !!user,
-      isPatient: user?.role === 'patient',
-      isPharmacy: user?.role === 'pharmacy',
-      isAdmin: user?.role === 'admin'
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        login,
+        logout,
+        setUser
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
+
+// CUSTOM HOOK
+export const useAuth = () => {
+  return useContext(AuthContext);
+};
+
+export default useAuth;

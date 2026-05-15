@@ -36,6 +36,90 @@ export const getMyOrders = asyncHandler(async (req, res) => {
   }, 'Orders fetched successfully');
 });
 
+export const getOrders=async (req, res) => {
+
+  try {
+
+    const orders = await Order.find({
+      user: req.user._id
+    })
+    .populate('items.medicine')
+    .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      data: orders
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch orders'
+    });
+  }
+}
+
+export const createOrder = async (req, res) => {
+
+  try {
+
+    const {
+
+      pharmacyId,
+
+      items,
+
+      total,
+
+      deliveryType,
+
+      paymentMethod,
+
+      paymentStatus,
+
+      razorpayPaymentId
+
+    } = req.body;
+
+    const order = await Order.create({
+
+      user: req.user._id,
+
+      pharmacy: pharmacyId,
+
+      items,
+
+      total,
+
+      deliveryType,
+
+      paymentMethod,
+
+      paymentStatus,
+
+      razorpayPaymentId
+
+    });
+
+    res.status(201).json({
+      success: true,
+      order
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      message: 'Order creation failed'
+    });
+  }
+}
+
 // Get order by ID
 export const getOrderById = asyncHandler(async (req, res) => {
   const order = await Order.findById(req.params.id)
@@ -136,6 +220,7 @@ export const createOrder = asyncHandler(async (req, res) => {
 
   await order.populate('pharmacy', 'name address phone');
   await order.populate('items.medicine', 'name genericName');
+  await order.populate('user');
 
   sendSuccess(res, 201, { order }, 'Order created successfully');
 });
@@ -179,13 +264,17 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
   order.status = status;
   
   if (status === 'delivered') {
-    order.deliveredAt = new Date();
-    
-    // Update stock quantities
     for (const item of order.items) {
       await Stock.findOneAndUpdate(
-        { pharmacy: order.pharmacy, medicine: item.medicine },
-        { $inc: { quantity: -item.quantity } }
+        {
+          pharmacy: order.pharmacy,
+          medicine: item.medicine
+        },
+        {
+          $inc: {
+            quantity: -item.quantity
+          }
+        }
       );
     }
   }
@@ -253,6 +342,57 @@ export const getPharmacyOrders = asyncHandler(async (req, res) => {
     }
   }, 'Pharmacy orders fetched successfully');
 });
+
+export const ordercreate = async (req, res) => {
+
+  try {
+
+    const {
+      items,
+      total,
+      deliveryType,
+      paymentMethod,
+      paymentStatus
+    } = req.body;
+
+    const order = await Order.create({
+
+      user: req.user._id,
+
+      pharmacy: items[0].pharmacyId,
+
+      items: items.map(item => ({
+        medicine: item.medicineId,
+        quantity: item.quantity,
+        price: Math.round(item.price)
+      })),
+
+      subtotal: Math.round(total),
+
+      total: Math.round(total),
+
+      deliveryType,
+
+      paymentMethod,
+
+      paymentStatus
+    });
+
+    res.status(201).json({
+      success: true,
+      data: order
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      message: 'Order creation failed'
+    });
+  }
+}
 
 // Cancel order (patient - only if pending)
 export const cancelOrder = asyncHandler(async (req, res) => {

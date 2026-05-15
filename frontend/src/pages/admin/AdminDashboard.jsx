@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { adminAPI } from '../../services/api';
+import api, { adminAPI } from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
 
 const AdminDashboard = () => {
@@ -22,13 +22,10 @@ const AdminDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const response = await adminAPI.getDashboardStats();
-      setStats(response.data.stats);
-      setRecentActivity(response.data.recentActivity || []);
-    } catch (error) {
-      showNotification('Failed to fetch dashboard data', 'error');
-    } finally {
-      setLoading(false);
+      const res = await api.get('/admin/dashboard');
+      setDashboard(res.data.data);
+    } catch (err) {
+      console.log(err);
     }
   };
 

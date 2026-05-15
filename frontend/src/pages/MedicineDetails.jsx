@@ -9,13 +9,16 @@ const MedicineDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { addItem } = useCart();
+  const { addToCart } = useCart();
   const { success, error } = useNotification();
   
   const [medicine, setMedicine] = useState(null);
   const [availability, setAvailability] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState(null);
+  const [selectedPharmacy, setSelectedPharmacy] = useState(null);
+  const [quantity, setQuantity] = useState(1);
+  const { showNotification } = useNotification();
 
   useEffect(() => {
     // Try to get user location
@@ -43,45 +46,91 @@ const MedicineDetails = () => {
 
   const fetchMedicineDetails = async () => {
     setLoading(true);
+
     try {
-      const response = await medicineAPI.getAvailability(id, {
-        lat: userLocation?.lat,
-        lng: userLocation?.lng,
-        radius: 20
-      });
-      setMedicine(response.data.data.medicine);
-      setAvailability(response.data.data.availability);
+      const response =
+        await medicineAPI.getAvailability(id, {
+          lat: userLocation?.lat,
+          lng: userLocation?.lng,
+          radius: 20
+        });
+
+      console.log('Availability API:', response.data);
+
+      // MEDICINE
+      const medicineRes =
+        await medicineAPI.getById(id);
+
+      const medicineData =
+        medicineRes.data?.data?.medicine || null;
+
+      // AVAILABILITY
+      const availabilityData =
+        response.data?.data?.availability || [];
+
+      setMedicine(medicineData);
+
+      setAvailability(availabilityData);
+
+      // AUTO SELECT FIRST PHARMACY
+      if (availabilityData.length > 0) {
+        setSelectedPharmacy(availabilityData[0]);
+      }
     } catch (err) {
-      error('Failed to fetch medicine details');
       console.error(err);
+
+      error('Failed to fetch medicine details');
+
+      setMedicine(null);
+
+      setAvailability([]);
     } finally {
       setLoading(false);
     }
   };
+ const handleAddToCart = () => {
 
-  const handleAddToCart = (stock) => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
+  if (!selectedPharmacy) {
+    error('Select pharmacy first');
+    return;
+  }
 
-    const added = addItem(
-      {
-        medicineId: medicine._id,
-        medicineName: medicine.name,
-        genericName: medicine.genericName,
-        price: stock.price,
-        discount: stock.discount || 0,
-        quantity: 1,
-        stockId: stock._id
-      },
-      stock.pharmacy
-    );
+  // FIXED PRICE
+  const fixedPrice = parseInt(
+    selectedPharmacy.price ||
+    medicine.price ||
+    medicine.mrp ||
+    0
+  );
 
-    if (added) {
-      success(`${medicine.name} added to cart`);
-    }
+  const cartItem = {
+
+    _id: `${medicine._id}-${selectedPharmacy._id}`,
+
+    medicineId: medicine._id,
+
+    pharmacyId: selectedPharmacy._id,
+
+    name: medicine.name,
+
+    image: medicine.image,
+
+    quantity,
+
+    // IMPORTANT
+    price: fixedPrice,
+
+    pharmacyPrice: fixedPrice,
+
+    selectedStore: selectedPharmacy.name,
+
+    stock: selectedPharmacy.stock
   };
+
+  addToCart(cartItem);
+
+  success('Added to cart');
+};
 
   const handleCreateAlert = async () => {
     if (!user) {
@@ -157,79 +206,158 @@ const MedicineDetails = () => {
         </div>
       </div>
 
-      {/* Availability */}
-      <h2 className="mb-3">
-        Available at {availability.length} Nearby Pharmac{availability.length !== 1 ? 'ies' : 'y'}
-      </h2>
+     {/* Availability */}
+    {(() => {
+      const availableStocks = availability.filter(
+        (item) => Number(item.quantity) > 0
+      );
+      return (
+        <>
+          <h2 className="mb-3">
+            Available at {availableStocks.length} Nearby Pharmac
+            {availableStocks.length !== 1 ? 'ies' : 'y'}
+          </h2>
 
-      {availability.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {availability.map((stock) => (
-            <div key={stock._id} className="card">
-              <div className="card-body">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                  <div style={{ flex: '1 1 300px' }}>
-                    <Link to={`/pharmacies/${stock.pharmacy._id}`} style={{ textDecoration: 'none' }}>
-                      <h4 className="pharmacy-name">{stock.pharmacy.name}</h4>
-                    </Link>
-                    <p className="pharmacy-address">
-                      {stock.pharmacy.address.street}, {stock.pharmacy.address.city}
-                    </p>
-                    {stock.distance && (
-                      <p className="pharmacy-distance">{stock.distance} km away</p>
-                    )}
-                    <div style={{ marginTop: '0.5rem' }}>
-                      <span className="text-sm text-muted">
-                        {stock.quantity} units in stock
-                      </span>
-                      {stock.quantity < 10 && (
-                        <span className="badge badge-warning" style={{ marginLeft: '0.5rem' }}>
-                          Low Stock
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ marginBottom: '0.5rem' }}>
-                      <span style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary)' }}>
-                        Rs. {(stock.price - (stock.price * (stock.discount || 0) / 100)).toFixed(2)}
-                      </span>
-                      {stock.discount > 0 && (
-                        <>
-                          <span className="medicine-mrp">Rs. {stock.price}</span>
-                          <span className="badge badge-success" style={{ marginLeft: '0.5rem' }}>
-                            {stock.discount}% OFF
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    <button 
-                      className="btn btn-primary"
-                      onClick={() => handleAddToCart(stock)}
+          {availableStocks.length > 0 ? (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem'
+              }}
+            >
+              {availableStocks.map((stock) => (
+                <div key={stock._id} className="card">
+                  <div className="card-body">
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '1rem'
+                      }}
                     >
-                      Add to Cart
-                    </button>
+                      <div style={{ flex: '1 1 300px' }}>
+                        <Link
+                          to={`/pharmacies/${stock.pharmacy?._id}`}
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <h4 className="pharmacy-name">
+                            {stock.pharmacy?.name}
+                          </h4>
+                        </Link>
+
+                        <p className="pharmacy-address">
+                          {stock.pharmacy?.address?.street},{' '}
+                          {stock.pharmacy?.address?.city}
+                        </p>
+
+                        {stock.distance && (
+                          <p className="pharmacy-distance">
+                            {stock.distance} km away
+                          </p>
+                        )}
+
+                        <div style={{ marginTop: '0.5rem' }}>
+                          <span className="text-sm text-muted">
+                            {stock.quantity} units in stock
+                          </span>
+
+                          {stock.quantity < 10 && (
+                            <span
+                              className="badge badge-warning"
+                              style={{ marginLeft: '0.5rem' }}
+                            >
+                              Low Stock
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ marginBottom: '0.5rem' }}>
+                          <span
+                            style={{
+                              fontSize: '1.5rem',
+                              fontWeight: '700',
+                              color: 'var(--primary)'
+                            }}
+                          >
+                            Rs.
+                            {(
+                              stock.price -
+                              (stock.price *
+                                (stock.discount || 0)) /
+                                100
+                            ).toFixed(2)}
+                          </span>
+
+                          {stock.discount > 0 && (
+                            <>
+                              <span className="medicine-mrp">
+                                Rs. {stock.price}
+                              </span>
+
+                              <span
+                                className="badge badge-success"
+                                style={{ marginLeft: '0.5rem' }}
+                              >
+                                {stock.discount}% OFF
+                              </span>
+                            </>
+                          )}
+                        </div>
+
+                        <button
+                          className="btn btn-primary"
+                          onClick={() =>
+                            handleAddToCart(stock)
+                          }
+                        >
+                          Add to Cart
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
+              ))}
+            </div>
+          ) : (
+            <div className="card">
+              <div
+                className="card-body text-center"
+                style={{ padding: '3rem' }}
+              >
+                <div
+                  style={{
+                    fontSize: '4rem',
+                    marginBottom: '1rem'
+                  }}
+                >
+                  😔
+                </div>
+
+                <h3>Not Available Nearby</h3>
+
+                <p className="text-muted mb-3">
+                  This medicine is currently not
+                  available at any pharmacy in your
+                  area.
+                </p>
+
+                <button
+                  className="btn btn-primary"
+                  onClick={handleAddToCart}
+                >
+                  Notify Me When Available
+                </button>
               </div>
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="card">
-          <div className="card-body text-center" style={{ padding: '3rem' }}>
-            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>😔</div>
-            <h3>Not Available Nearby</h3>
-            <p className="text-muted mb-3">
-              This medicine is currently not available at any pharmacy in your area.
-            </p>
-            <button className="btn btn-primary" onClick={handleCreateAlert}>
-              Notify Me When Available
-            </button>
-          </div>
-        </div>
-      )}
+          )}
+        </>
+      );
+    })()}
 
       {/* Back Button */}
       <div style={{ marginTop: '2rem' }}>

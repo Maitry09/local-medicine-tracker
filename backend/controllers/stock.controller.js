@@ -7,69 +7,24 @@ import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
 // Get my pharmacy stock (pharmacy owner)
 // GET /api/stock/
 export const getMyStock = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20, search, category, inStock, lowStock } = req.query;
-
   const pharmacy = await Pharmacy.findOne({ owner: req.userId });
-  if (!pharmacy) return sendError(res, 404, 'Pharmacy not found');
 
-  // FIXED: Build the full query including medicine filters using aggregation pipeline
-  // This moves filtering BEFORE pagination — results and count are always consistent
+  if (!pharmacy) {
+    return sendError(res, 404, 'Pharmacy not found');
+  }
 
-  const pipeline = [
-    // Step 1: Match stock for this pharmacy
-    { $match: { pharmacy: pharmacy._id } },
+  const stock = await Stock.find({ pharmacy: pharmacy._id })
+    .populate('medicine')
+    .sort({ createdAt: -1 });
 
-    // Step 2: Join with medicines collection
+  sendSuccess(
+    res,
+    200,
     {
-      $lookup: {
-        from: 'medicines',
-        localField: 'medicine',
-        foreignField: '_id',
-        as: 'medicine'
-      }
+      stock
     },
-    { $unwind: '$medicine' },
-
-    // Step 3: Apply all filters BEFORE pagination
-    ...(inStock === 'true' ? [{ $match: { quantity: { $gt: 0 }, isAvailable: true } }] : []),
-    ...(lowStock === 'true' ? [{ $match: { quantity: { $gt: 0, $lte: 10 } } }] : []),
-    ...(search ? [{
-      $match: {
-        $or: [
-          { 'medicine.name': { $regex: search, $options: 'i' } },
-          { 'medicine.genericName': { $regex: search, $options: 'i' } }
-        ]
-      }
-    }] : []),
-    ...(category ? [{ $match: { 'medicine.category': category } }] : []),
-
-    // Step 4: Sort
-    { $sort: { lastUpdated: -1 } },
-
-    // Step 5: Facet for pagination + total in one query
-    {
-      $facet: {
-        stock: [
-          { $skip: (parseInt(page) - 1) * parseInt(limit) },
-          { $limit: parseInt(limit) }
-        ],
-        totalCount: [{ $count: 'count' }]
-      }
-    }
-  ];
-
-  const [result] = await Stock.aggregate(pipeline);
-  const stock = result.stock;
-  const total = result.totalCount[0]?.count || 0;
-
-  sendSuccess(res, 200, {
-    stock,
-    pagination: {
-      current: parseInt(page),
-      pages: Math.ceil(total / parseInt(limit)),
-      total
-    }
-  }, 'Stock fetched successfully');
+    'Stock fetched successfully'
+  );
 });
 
 // Add stock item (pharmacy owner)

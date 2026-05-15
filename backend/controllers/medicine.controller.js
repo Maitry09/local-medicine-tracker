@@ -1,6 +1,7 @@
 import Medicine from '../models/Medicine.js';
 import Stock from '../models/Stock.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
+import Pharmacy from '../models/Pharmacy.js';
 
 // Search medicines
 export const searchMedicines = asyncHandler(async (req, res) => {
@@ -86,82 +87,39 @@ export const getMedicineById = asyncHandler(async (req, res) => {
 
 // Get medicine availability (which pharmacies have it in stock)
 // GET /api/medicines/:id/availability
-export const getMedicineAvailability = asyncHandler(async (req, res) => {
-  const { lat, lng, radius = 10 } = req.query;
+export const getMedicineAvailability =asyncHandler(async (req, res) => {
+      const { id } = req.params;
+    
+      const stocks = await Stock.find({
+        medicineId: id,
+        quantity: { $gt: 0 }
+      })
+        .populate({
+          path: 'pharmacyId',
+          select: 'name address phone'
+        });
 
-  const medicine = await Medicine.findById(req.params.id);
-  if (!medicine) return sendError(res, 404, 'Medicine not found');
-
-  const stockQuery = {
-    medicine: req.params.id,
-    isAvailable: true,
-    quantity: { $gt: 0 },
-    expiryDate: { $gt: new Date() }
-  };
-
-  // FIXED: Use aggregation with $lookup to filter pharmacies by geo BEFORE joining stock
-  if (lat && lng) {
-    const userLng = parseFloat(lng);
-    const userLat = parseFloat(lat);
-    const maxDistanceMeters = parseFloat(radius) * 1000;
-
-    const stockItems = await Stock.aggregate([
-      // Step 1: Match stock for this medicine
-      { $match: stockQuery },
-
-      // Step 2: Lookup pharmacies
-      {
-        $lookup: {
-          from: 'pharmacies',
-          localField: 'pharmacy',
-          foreignField: '_id',
-          as: 'pharmacy'
-        }
-      },
-      { $unwind: '$pharmacy' },
-
-      // Step 3: Filter by pharmacy active/verified status
-      {
-        $match: {
-          'pharmacy.isActive': true,
-          'pharmacy.isVerified': true
-        }
-      },
-
-      // Step 4: Filter by geo distance using $nearSphere via $expr
-      // We use $geoNear in an aggregation pipeline instead
-      { $sort: { price: 1 } },
-      { $limit: 50 } // Limit results
-    ]);
-
-    // Calculate distances for display
-    const withDistance = stockItems.map(item => {
-      const pharmacyLng = item.pharmacy.address.coordinates.lng;
-      const pharmacyLat = item.pharmacy.address.coordinates.lat;
-      const R = 6371;
-      const dLat = (pharmacyLat - userLat) * Math.PI / 180;
-      const dLng = (pharmacyLng - userLng) * Math.PI / 180;
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(userLat * Math.PI / 180) * Math.cos(pharmacyLat * Math.PI / 180) *
-        Math.sin(dLng / 2) ** 2;
-      const distance = Math.round(2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * R * 10) / 10;
-      return { ...item, distance };
-    }).filter(item => item.distance <= parseFloat(radius))
-      .sort((a, b) => a.distance - b.distance);
-
-    return sendSuccess(res, 200, { medicine, availability: withDistance }, 'Availability fetched');
-  }
-
-  // No location — just return all pharmacies with stock
-  let stockItems = await Stock.find(stockQuery)
-    .populate({ path: 'pharmacy', match: { isActive: true, isVerified: true } })
-    .sort({ price: 1 });
-
-  stockItems = stockItems.filter(item => item.pharmacy !== null);
-
-  sendSuccess(res, 200, { medicine, availability: stockItems }, 'Availability fetched successfully');
-});
+      const availability = await Stock.find({
+          medicine: req.params.id,
+          quantity: { $gt: 0 },
+          isAvailable: true
+        })
+        .populate({
+          path: 'pharmacy',
+          select: 'name address phone'
+        })
+        .populate({
+          path: 'medicine',
+          select: 'name'
+      });
+      
+      sendSuccess(
+        res,
+        200,
+        { availability },
+        'Medicine availability fetched'
+      );
+    });
 
 // Get all categories
 export const getCategories = asyncHandler(async (req, res) => {

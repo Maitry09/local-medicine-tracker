@@ -1,4 +1,9 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect
+} from 'react';
 
 const CartContext = createContext(null);
 
@@ -6,126 +11,225 @@ const CART_STORAGE_KEY = 'medicine_tracker_cart';
 
 export const useCart = () => {
   const context = useContext(CartContext);
+
   if (!context) {
-    throw new Error('useCart must be used within a CartProvider');
+    throw new Error('useCart must be used within CartProvider');
   }
+
   return context;
 };
 
 export const CartProvider = ({ children }) => {
-
-  // Initialize cart from localStorage so it survives page refresh
   const [cartItems, setCartItems] = useState(() => {
     try {
       const saved = localStorage.getItem(CART_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
+
+      if (!saved) return [];
+
+      const parsed = JSON.parse(saved);
+
+      // ensure array
+      if (!Array.isArray(parsed)) return [];
+
+      // normalize + filter bad items
+      return parsed
+        .filter(item => item && (item._id || item.medicineId))
+        .map(item => ({
+          _id: item._id || item.medicineId,
+          medicineId: item.medicineId || item._id,
+          pharmacyId: item.pharmacyId || item.pharmacy?._id,
+          pharmacyName: item.pharmacyName || item.pharmacy?.name || 'Pharmacy',
+          medicine: item.medicine || {},
+          name: item.name || item.medicine?.name || 'Medicine',
+          price: Number(item.price) || 0,
+          quantity: Number(item.quantity) || 1,
+          discount: Number(item.discount) || 0,
+          maxQuantity: Number(item.maxQuantity) || 10
+        }));
+
     } catch (err) {
-      // If localStorage is corrupted, start fresh
-      console.error('Failed to load cart from storage:', err);
+      console.error('Failed to load cart:', err);
       return [];
     }
   });
 
-  // Persist cart to localStorage whenever it changes
+  // ✅ SAVE CART
   useEffect(() => {
     try {
-      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
+      localStorage.setItem(
+        CART_STORAGE_KEY,
+        JSON.stringify(cartItems)
+      );
     } catch (err) {
-      console.error('Failed to save cart to storage:', err);
+      console.error('Failed to save cart:', err);
     }
   }, [cartItems]);
 
-  const addToCart = (medicine, pharmacy, stockItem) => {
-    setCartItems(prev => {
-      const existingIndex = prev.findIndex(
-        item => item.medicineId === medicine._id && item.pharmacyId === pharmacy._id
-      );
+  const addToCart = (item) => {
 
-      if (existingIndex >= 0) {
-        // Update quantity if already in cart
-        const updated = [...prev];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
-          quantity: updated[existingIndex].quantity + 1
-        };
-        return updated;
-      }
-
-      // Add new item
-      return [...prev, {
-        id: `${medicine._id}_${pharmacy._id}`,
-        medicineId: medicine._id,
-        medicineName: medicine.name,
-        genericName: medicine.genericName,
-        pharmacyId: pharmacy._id,
-        pharmacyName: pharmacy.name,
-        price: stockItem.price,
-        discount: stockItem.discount || 0,
-        quantity: 1,
-        maxQuantity: stockItem.quantity,
-        prescriptionRequired: medicine.prescriptionRequired
-      }];
-    });
+  const finalItem = {
+    ...item,
+    price: Math.round(Number(item.price || 0)),
+    pharmacyPrice: Math.round(Number(item.price || 0))
   };
 
-  const removeFromCart = (itemId, pharmacyId) => {
-    setCartItems(prev =>
-      prev.filter(item => !(item.medicineId === itemId && item.pharmacyId === pharmacyId))
+  setCartItems(prev => {
+
+    const existingItem = prev.find(
+      i => i._id === finalItem._id
     );
-  };
 
-  const updateQuantity = (itemId, pharmacyId, newQuantity) => {
-    if (newQuantity < 1) {
-      removeFromCart(itemId, pharmacyId);
-      return;
+    if (existingItem) {
+      return prev.map(i =>
+        i._id === finalItem._id
+          ? {
+              ...i,
+              quantity: i.quantity + finalItem.quantity
+            }
+          : i
+      );
     }
+
+    return [...prev, finalItem];
+  });
+};
+
+  // ✅ REMOVE
+  const removeFromCart = (  medicineId, pharmacyId) => {
     setCartItems(prev =>
-      prev.map(item =>
-        item.medicineId === itemId && item.pharmacyId === pharmacyId
-          ? { ...item, quantity: Math.min(newQuantity, item.maxQuantity) }
-          : item
+      prev.filter(
+        item =>
+          !(item.medicineId === medicineId && item.pharmacyId === pharmacyId)
       )
     );
   };
 
+  const updateQuantity = (
+  medicineId,
+  pharmacyId,
+  newQuantity
+) => {
+
+  if (newQuantity < 1) {
+
+    removeFromCart(
+      medicineId,
+      pharmacyId
+    );
+
+    return;
+  }
+
+  setCartItems((prev) =>
+
+    prev.map((item) => {
+
+      if (
+        item.medicineId === medicineId &&
+        item.pharmacyId === pharmacyId
+      ) {
+
+        return {
+
+          ...item,
+
+          quantity: Number(newQuantity),
+
+          // KEEP SAME PRICE
+          pharmacyPrice:
+            Number(
+              item.pharmacyPrice ||
+              item.price ||
+              0
+            ),
+
+          price:
+            Number(
+              item.pharmacyPrice ||
+              item.price ||
+              0
+            )
+        };
+      }
+
+      return item;
+    })
+  );
+};
+
+  // ✅ CLEAR CART
   const clearCart = () => {
     setCartItems([]);
     localStorage.removeItem(CART_STORAGE_KEY);
   };
 
-  const getCartTotal = () => {
-    return cartItems.reduce((total, item) => {
-      const discountedPrice = item.price - (item.price * item.discount / 100);
-      return total + (discountedPrice * item.quantity);
-    }, 0);
-  };
+const getCartTotal = () => {
+
+  return cartItems.reduce(
+    (total, item) => {
+
+      const itemPrice =
+        Number(
+          item.pharmacyPrice ||
+          item.price ||
+          0
+        );
+
+      const quantity =
+        Number(item.quantity || 1);
+
+      return (
+        total +
+        Math.round(item.price) * quantity
+      );
+
+    },
+    0
+  );
+};
 
   const getItemsByPharmacy = () => {
     return cartItems.reduce((groups, item) => {
-      const key = item.pharmacyId;
-      if (!groups[key]) groups[key] = { pharmacyName: item.pharmacyName, items: [] };
+      const key = item.pharmacyId || 'unknown';
+
+      if (!groups[key]) {
+        groups[key] = {
+          pharmacyName: item.pharmacyName || 'Pharmacy',
+          items: []
+        };
+      }
+
       groups[key].items.push(item);
+
       return groups;
     }, {});
   };
 
-  const getTotalItems = () => cartItems.reduce((sum, item) => sum + item.quantity, 0);
-  
-  // FIXED: Add getItemCount as an alias for getTotalItems for backward compatibility
-  const getItemCount = getTotalItems;
+  // ✅ TOTAL ITEMS
+  const getTotalItems = () => {
+    return cartItems.reduce(
+      (sum, item) => sum + (Number(item.quantity) || 0),
+      0
+    );
+  };
 
   return (
-    <CartContext.Provider value={{
-      cartItems,
-      addToCart,
-      removeFromCart,
-      updateQuantity,
-      clearCart,
-      getCartTotal,
-      getItemsByPharmacy,
-      getTotalItems,
-      getItemCount  // FIXED: Export getItemCount
-    }}>
+    <CartContext.Provider
+      value={{
+        cartItems: Array.isArray(cartItems) ? cartItems : [],
+        setCartItems,
+
+        addToCart,
+        removeFromCart,
+        updateQuantity,
+        clearCart,
+
+        getCartTotal,
+        getItemsByPharmacy,
+        getTotalItems,
+        getItemCount: getTotalItems
+      }}
+    >
       {children}
     </CartContext.Provider>
   );

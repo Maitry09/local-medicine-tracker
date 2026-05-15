@@ -20,27 +20,55 @@ export default function PatientDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      console.log('🔄 Fetching patient dashboard data...');
-      const [ordersRes, alertsRes] = await Promise.all([
-        api.get('/orders/my-orders?limit=5'),
-        api.get('/alerts/my-alerts')
-      ]);
+      setLoading(true);
 
-      console.log('📊 Orders response:', ordersRes.data);
-      console.log('🔔 Alerts response:', alertsRes.data);
+      const [ordersRes, alertsRes] =
+        await Promise.allSettled([
+          api.get('/orders/my'),
+          api.get('/alerts')
+        ]);
 
-      const orders = ordersRes.data.data.orders || [];
-      const alerts = alertsRes.data.data.alerts || [];
+      let orders = [];
+      let alerts = [];
 
-      setRecentOrders(orders);
+      // ORDERS
+      if (ordersRes.status === 'fulfilled') {
+        orders =
+          ordersRes.value?.data?.data?.orders ||
+          [];
+      }
+
+      // ALERTS
+      if (alertsRes.status === 'fulfilled') {
+        alerts =
+          alertsRes.value?.data?.data?.alerts ||
+          [];
+      }
+
+      // RECENT ORDERS
+      setRecentOrders(orders.slice(0, 5));
+
+      // STATS
       setStats({
-        totalOrders: ordersRes.data.data.total || orders.length,
-        activeOrders: orders.filter(o => !['delivered', 'cancelled'].includes(o.status)).length,
-        activeAlerts: alerts.filter(a => a.isActive).length,
-        savedPharmacies: user?.savedPharmacies?.length || 0
+        totalOrders: orders.length,
+
+        activeOrders: orders.filter(
+          (o) =>
+            o.status === 'pending' ||
+            o.status === 'confirmed' ||
+            o.status === 'processing' ||
+            o.status === 'ready'
+        ).length,
+
+        activeAlerts: alerts.length,
+
+        savedPharmacies: 0
       });
     } catch (error) {
-      console.error('❌ Failed to fetch dashboard data:', error);
+      console.log(
+        'Dashboard fetch error:',
+        error
+      );
     } finally {
       setLoading(false);
     }
@@ -91,7 +119,7 @@ export default function PatientDashboard() {
               <div key={order._id} style={{ background: 'white', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '15px' }}>
                 <p><strong>Order ID:</strong> {order._id}</p>
                 <p><strong>Status:</strong> {order.status}</p>
-                <p><strong>Total:</strong> Rs. {order.totalAmount}</p>
+                <p><strong>Total:</strong> Rs.{(order.totalAmount || order.total || 0).toFixed(2)}</p>
               </div>
             ))}
           </div>

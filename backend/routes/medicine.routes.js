@@ -8,6 +8,7 @@ import {
   updateMedicine,
   deleteMedicine
 } from '../controllers/medicine.controller.js';
+import { getPharmacyMedicines } from '../controllers/pharmacy.controller.js';
 import { authMiddleware, requireRole, optionalAuth } from '../middleware/auth.middleware.js';
 import { medicineValidation, mongoIdValidation, searchValidation, validate } from '../middleware/validation.middleware.js';
 
@@ -18,6 +19,7 @@ router.get('/search', searchValidation, validate, searchMedicines);
 router.get('/categories', getCategories);
 router.get('/:id', mongoIdValidation('id'), validate, getMedicineById);
 router.get('/:id/availability', mongoIdValidation('id'), validate, getMedicineAvailability);
+router.get('/:id/pharmacies', mongoIdValidation('id'), validate, getPharmacyMedicines);
 
 // Admin only routes
 router.post('/', authMiddleware, requireRole('admin'), medicineValidation, validate, createMedicine);

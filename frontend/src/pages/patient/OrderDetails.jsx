@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import '../../styles/orderdetails.css';
 
 export default function OrderDetails() {
   const { id } = useParams();
@@ -18,7 +19,7 @@ export default function OrderDetails() {
       setOrder(response.data.data.order);
     } catch (error) {
       console.error('Failed to fetch order:', error);
-      navigate('/patient/orders');
+      navigate('/orders');
     } finally {
       setLoading(false);
     }
@@ -171,7 +172,11 @@ export default function OrderDetails() {
               </div>
               <div className="summary-row total">
                 <span>Total</span>
-                <span>₹{order.totalAmount?.toFixed(2)}</span>
+                <span>₹{order.totalAmount = order.items.reduce(
+                        (sum, item) =>
+                          sum + item.price * item.quantity,
+                        0
+                      )}</span>
               </div>
             </div>
           </div>

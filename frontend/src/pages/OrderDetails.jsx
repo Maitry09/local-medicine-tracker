@@ -15,8 +15,8 @@ const OrderDetails = () => {
 
   const fetchOrder = async () => {
     try {
-      const response = await orderAPI.getOrderById(id);
-      setOrder(response.data.order);
+      const response = await orderAPI.getById(id);
+      setOrder(response.data.data.order);
     } catch (error) {
       showNotification('Failed to fetch order details', 'error');
     } finally {
@@ -106,7 +106,7 @@ const OrderDetails = () => {
           <section className="details-section">
             <h2>Order Items</h2>
             <div className="items-list">
-              {order.items.map((item, index) => (
+              {order.items?.map((item, index) => (
                 <div key={index} className="detail-item">
                   <img
                     src={item.medicine?.image || '/medicine-placeholder.png'}
@@ -118,8 +118,8 @@ const OrderDetails = () => {
                     <p className="item-qty">Quantity: {item.quantity}</p>
                   </div>
                   <div className="item-price">
-                    <p>Rs. {item.price.toFixed(2)}</p>
-                    <span>Total: Rs. {(item.price * item.quantity).toFixed(2)}</span>
+                    <p>Rs. {(item.price || 0).toFixed(2)}</p>
+                    <span>Total: Rs. {((item.price || 0) *(item.quantity || 0)).toFixed(2)}</span>
                   </div>
                 </div>
               ))}
@@ -170,7 +170,7 @@ const OrderDetails = () => {
             </div>
             <div className="summary-row total">
               <span>Total</span>
-              <span>Rs. {order.totalAmount.toFixed(2)}</span>
+              <span>Rs. {(order.totalAmount || 0).toFixed(2)}</span>
             </div>
           </div>
 

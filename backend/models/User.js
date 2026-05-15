@@ -8,6 +8,10 @@ const userSchema = new mongoose.Schema({
     trim: true,
     maxlength: [50, 'Name cannot exceed 50 characters']
   },
+  pharmacyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Pharmacy'
+  },
   email: {
     type: String,
     required: [true, 'Email is required'],
@@ -57,7 +61,8 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   }
-}, {
+  },
+  {
   timestamps: true
 });
 

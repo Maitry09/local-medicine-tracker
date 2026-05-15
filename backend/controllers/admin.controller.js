@@ -32,6 +32,20 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       { $group: { _id: null, total: { $sum: '$total' } } }
     ])
   ]);
+  const users = await User.find();
+
+  const pharmacies = await Pharmacy.find()
+    .populate('owner');
+
+  const orders = await Order.find()
+    .populate('user')
+    .populate('pharmacy')
+    .populate('items.medicine');
+  sendSuccess(res, 200, {
+    users,
+    pharmacies,
+    orders
+  });
 
   // Get recent orders
   const recentOrders = await Order.find()

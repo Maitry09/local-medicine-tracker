@@ -26,19 +26,13 @@ const PharmacyStock = () => {
   }, []);
 
   const fetchData = async () => {
-    try {
-      const [stockRes, medicineRes] = await Promise.all([
-        pharmacyAPI.getMyPharmacyStock(),
-        medicineAPI.getMedicines({ limit: 1000 }),
-      ]);
-      setStocks(stockRes.data.stocks);
-      setMedicines(medicineRes.data.medicines);
-    } catch (error) {
-      showNotification('Failed to fetch data', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    const res = await api.get('/stock');
+    setStock(res.data.data.stock);
+  } catch (err) {
+    console.log(err);
+  }
+};
 
   const handleAddStock = async (e) => {
     e.preventDefault();

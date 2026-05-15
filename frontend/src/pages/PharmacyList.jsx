@@ -2,47 +2,6 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { pharmacyAPI } from '../services/api';
 
-const featuredPharmacies = [
-  {
-    _id: 'featured-1',
-    name: 'Apollo Pharmacy',
-    address: {
-      street: '120 Connaught Place',
-      city: 'New Delhi',
-      pincode: '110001'
-    },
-    operatingHours: { is24Hours: false, open: '08:00', close: '23:00' },
-    rating: 4.7,
-    totalRatings: 420,
-    distance: 1.2
-  },
-  {
-    _id: 'featured-2',
-    name: 'MedPlus Pharmacy',
-    address: {
-      street: 'Shop No. 5, Sector 18',
-      city: 'Noida',
-      pincode: '201301'
-    },
-    operatingHours: { is24Hours: true, open: '00:00', close: '23:59' },
-    rating: 4.5,
-    totalRatings: 368,
-    distance: 0.9
-  },
-  {
-    _id: 'featured-3',
-    name: 'HealthKart Pharmacy',
-    address: {
-      street: '45 MG Road',
-      city: 'Bengaluru',
-      pincode: '560001'
-    },
-    operatingHours: { is24Hours: false, open: '09:00', close: '22:00' },
-    rating: 4.6,
-    totalRatings: 294,
-    distance: 2.4
-  }
-];
 
 const PharmacyList = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -138,24 +97,7 @@ const PharmacyList = () => {
         <p className="page-subtitle">Discover verified pharmacies near you</p>
       </div>
 
-      {/* Featured */}
-      <div className="card mb-4">
-        <div className="card-body">
-          <h2 style={{ marginBottom: '1rem' }}>Featured pharmacies</h2>
-          <div className="grid grid-3">
-            {featuredPharmacies.map((pharmacy) => (
-              <div key={pharmacy._id} className="card pharmacy-card">
-                <div className="card-body">
-                  <h3>{pharmacy.name}</h3>
-                  <p>{pharmacy.address.street}, {pharmacy.address.city}</p>
-                  <p>{pharmacy.distance} km away</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
+    
       {/* Results */}
       {loading ? (
         <p>Loading...</p>

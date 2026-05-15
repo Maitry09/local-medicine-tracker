@@ -1,7 +1,7 @@
 import Pharmacy from '../models/Pharmacy.js';
 import User from '../models/User.js';
-import Stock from '../models/Stock.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
+import Stock from '../models/Stock.js';
 
 // Get all pharmacies
 // GET /api/pharmacies
@@ -292,4 +292,19 @@ export const deletePharmacy = asyncHandler(async (req, res) => {
   await Pharmacy.findByIdAndDelete(req.params.id);
 
   sendSuccess(res, 200, null, 'Pharmacy deleted successfully');
+});
+
+export const getPharmacyMedicines = asyncHandler(async (req, res) => {
+  const pharmacyId = req.params.id;
+
+  const medicines = await Stock.find({
+    pharmacy: pharmacyId,
+    quantity: { $gt: 0 }
+  })
+    .populate('medicine')
+    .populate('pharmacy');
+
+  sendSuccess(res, 200, {
+    medicines
+  }, 'Medicines fetched');
 });

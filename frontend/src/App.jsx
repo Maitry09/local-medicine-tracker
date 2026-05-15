@@ -19,6 +19,7 @@ import Register from './pages/auth/Register';
 
 // Patient Pages
 import PatientDashboard from './pages/patient/Dashboard';
+import PrescriptionUpload from './pages/patient/PrescriptionUpload';
 import MyOrders from './pages/patient/MyOrders';
 import OrderDetails from './pages/patient/OrderDetails';
 import MyAlerts from './pages/patient/MyAlerts';
@@ -43,91 +44,181 @@ import AdminOrders from './pages/admin/AdminOrders';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function RootRedirect() {
-  const { user, loading } = useAuth();
-  
-  // Show loading while checking auth status
+  const { user, token, loading } = useAuth();
+
   if (loading) {
-    return (
-      <div className="loading-screen">
-        <div className="spinner"></div>
-        <p>Loading...</p>
-      </div>
-    );
+    return <div>Loading...</div>;
   }
-  
-  // If no user, show home page
-  if (!user) {
+
+  if (!token || !user) {
     return <Home />;
   }
-  
-  // Redirect based on user role
-  if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
-  if (user.role === 'pharmacy') return <Navigate to="/pharmacy/dashboard" replace />;
+
+  if (user?.role === 'admin') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
+  if (user?.role === 'pharmacy') {
+    return <Navigate to="/pharmacy/dashboard" replace />;
+  }
+
   return <Navigate to="/dashboard" replace />;
 }
 
-// FIXED: AuthRedirect component to handle user check properly
 function AuthRedirect({ children }) {
-  const { user } = useAuth();
-  return user ? <Navigate to="/" replace /> : children;
+  const { token } = useAuth();
+
+  return token ? <Navigate to="/" replace /> : children;
 }
 
 function App() {
+  const { loading } = useAuth();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <Routes>
-      {/* Public Routes */}
+      {/* PUBLIC ROUTES */}
       <Route element={<MainLayout />}>
         <Route path="/" element={<RootRedirect />} />
+
         <Route path="/search" element={<SearchMedicines />} />
+
         <Route path="/medicines/:id" element={<MedicineDetails />} />
+
         <Route path="/pharmacies" element={<PharmacyList />} />
+
         <Route path="/pharmacies/:id" element={<PharmacyDetails />} />
+
+        <Route path="/cart" element={<Cart />} />
+
+        <Route path="/checkout" element={<Checkout />} />
       </Route>
 
-      {/* Auth Routes - FIXED */}
+      {/* AUTH ROUTES */}
       <Route element={<AuthLayout />}>
-        <Route path="/login" element={<AuthRedirect><Login /></AuthRedirect>} />
-        <Route path="/register" element={<AuthRedirect><Register /></AuthRedirect>} />
+        <Route
+          path="/login"
+          element={
+            <AuthRedirect>
+              <Login />
+            </AuthRedirect>
+          }
+        />
+
+        <Route
+          path="/register"
+          element={
+            <AuthRedirect>
+              <Register />
+            </AuthRedirect>
+          }
+        />
       </Route>
 
-      {/* Patient Routes */}
-      <Route element={<ProtectedRoute allowedRoles={['patient', 'pharmacy', 'admin']} />}>
+      {/* PATIENT ROUTES */}
+      <Route
+        element={<ProtectedRoute allowedRoles={['patient']} />}
+      >
         <Route element={<DashboardLayout />}>
-          <Route path="/dashboard" element={<PatientDashboard />} />
-          <Route path="/orders" element={<MyOrders />} />
-          <Route path="/orders/:id" element={<OrderDetails />} />
-          <Route path="/alerts" element={<MyAlerts />} />
-        </Route>
-        <Route element={<MainLayout />}>
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/checkout" element={<Checkout />} />
+          <Route
+            path="/dashboard"
+            element={<PatientDashboard />}
+          />
+
+          <Route
+            path="/orders"
+            element={<MyOrders />}
+          />
+
+          <Route
+            path="/orders/:id"
+            element={<OrderDetails />}
+          />
+
+          <Route
+            path="/alerts"
+            element={<MyAlerts />}
+          />
+
+          <Route
+            path="/patient/prescription-upload"
+            element={<PrescriptionUpload />}
+          />
         </Route>
       </Route>
 
-      {/* Pharmacy Routes */}
-      <Route element={<ProtectedRoute allowedRoles={['pharmacy', 'admin']} />}>
+      {/* PHARMACY ROUTES */}
+      <Route
+        element={<ProtectedRoute allowedRoles={['pharmacy']} />}
+      >
         <Route element={<DashboardLayout />}>
-          <Route path="/pharmacy/dashboard" element={<PharmacyDashboard />} />
-          <Route path="/pharmacy/analytics" element={<PharmacyAnalytics />} />
-          <Route path="/pharmacy/stock" element={<ManageStock />} />
-          <Route path="/pharmacy/orders" element={<PharmacyOrders />} />
-          <Route path="/pharmacy/profile" element={<PharmacyProfile />} />
+          <Route
+            path="/pharmacy/dashboard"
+            element={<PharmacyDashboard />}
+          />
+
+          <Route
+            path="/pharmacy/analytics"
+            element={<PharmacyAnalytics />}
+          />
+
+          <Route
+            path="/pharmacy/stock"
+            element={<ManageStock />}
+          />
+
+          <Route
+            path="/pharmacy/orders"
+            element={<PharmacyOrders />}
+          />
+
+          <Route
+            path="/pharmacy/profile"
+            element={<PharmacyProfile />}
+          />
         </Route>
       </Route>
 
-      {/* Admin Routes */}
-      <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+      {/* ADMIN ROUTES */}
+      <Route
+        element={<ProtectedRoute allowedRoles={['admin']} />}
+      >
         <Route element={<DashboardLayout />}>
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          <Route path="/admin/users" element={<ManageUsers />} />
-          <Route path="/admin/pharmacies" element={<ManagePharmacies />} />
-          <Route path="/admin/medicines" element={<ManageMedicines />} />
-          <Route path="/admin/orders" element={<AdminOrders />} />
+          <Route
+            path="/admin/dashboard"
+            element={<AdminDashboard />}
+          />
+
+          <Route
+            path="/admin/users"
+            element={<ManageUsers />}
+          />
+
+          <Route
+            path="/admin/pharmacies"
+            element={<ManagePharmacies />}
+          />
+
+          <Route
+            path="/admin/medicines"
+            element={<ManageMedicines />}
+          />
+
+          <Route
+            path="/admin/orders"
+            element={<AdminOrders />}
+          />
         </Route>
       </Route>
 
       {/* 404 */}
-      <Route path="*" element={<Navigate to="/" />} />
+      <Route
+        path="*"
+        element={<Navigate to="/" replace />}
+      />
     </Routes>
   );
 }

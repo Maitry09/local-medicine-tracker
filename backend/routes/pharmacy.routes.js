@@ -10,6 +10,7 @@ import {
   disablePharmacy,
   deletePharmacy
 } from '../controllers/pharmacy.controller.js';
+import { getPharmacyMedicines } from '../controllers/pharmacy.controller.js';
 import { authMiddleware, requireRole } from '../middleware/auth.middleware.js';
 import { pharmacyValidation, mongoIdValidation, validate } from '../middleware/validation.middleware.js';
 
@@ -19,6 +20,7 @@ const router = express.Router();
 router.get('/', getAllPharmacies);
 router.get('/:id', mongoIdValidation('id'), validate, getPharmacyById);
 router.get('/:id/stock', mongoIdValidation('id'), validate, getPharmacyStock);
+router.get('/:id/medicines', getPharmacyMedicines);
 
 // Pharmacy owner routes
 router.post('/register', authMiddleware, requireRole('pharmacy'), pharmacyValidation, validate, registerPharmacy);
