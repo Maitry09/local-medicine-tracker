@@ -3,8 +3,7 @@ import mongoose from 'mongoose';
 const prescriptionSchema = new mongoose.Schema({
   order: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Order',
-    required: true
+    ref: 'Order'
   },
   patient: {
     type: mongoose.Schema.Types.ObjectId,
@@ -13,8 +12,7 @@ const prescriptionSchema = new mongoose.Schema({
   },
   pharmacy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Pharmacy',
-    required: true
+    ref: 'Pharmacy'
   },
   imageUrl: {
     type: String,

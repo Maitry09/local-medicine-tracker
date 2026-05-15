@@ -180,7 +180,7 @@ const getCartTotal = () => {
 
       return (
         total +
-        Math.round(item.price) * quantity
+        Number(item.price || 0) * quantity
       );
 
     },

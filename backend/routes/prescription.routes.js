@@ -40,25 +40,32 @@ router.post('/upload', authMiddleware, requireRole('patient'), upload.single('pr
     const { orderId } = req.body;
     if (!req.file) return sendError(res, 400, 'Prescription file is required');
 
-    const order = await Order.findById(orderId).populate('pharmacy');
-    if (!order) return sendError(res, 404, 'Order not found');
-    if (order.user.toString() !== req.userId) return sendError(res, 403, 'Access denied');
+    let order;
+    let pharmacyId;
+
+    if (orderId) {
+      order = await Order.findById(orderId).populate('pharmacy');
+      if (!order) return sendError(res, 404, 'Order not found');
+      if (order.user.toString() !== req.userId) return sendError(res, 403, 'Access denied');
+      pharmacyId = order.pharmacy?._id;
+    }
 
     const imageUrl = `/uploads/prescriptions/${req.file.filename}`;
 
     const prescription = await Prescription.create({
-      order: orderId,
+      order: orderId || undefined,
       patient: req.userId,
-      pharmacy: order.pharmacy._id,
+      pharmacy: pharmacyId,
       imageUrl
     });
 
-    // Link to order
-    order.prescriptionImage = imageUrl;
-    order.prescriptionStatus = 'pending';
-    await order.save();
+    if (order) {
+      order.prescriptionImage = imageUrl;
+      order.prescriptionStatus = 'pending';
+      await order.save();
+    }
 
-    sendSuccess(res, 201, { prescription }, 'Prescription uploaded. Awaiting pharmacy review.');
+    sendSuccess(res, 201, { prescription }, 'Prescription uploaded successfully.');
   })
 );
 

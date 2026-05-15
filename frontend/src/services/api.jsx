@@ -132,6 +132,16 @@ export const alertAPI = {
   getTriggeredCount: () => api.get('/alerts/triggered/count')
 };
 
+// Notification API
+export const notificationAPI = {
+  getMyNotifications: (params) => api.get('/notifications', { params }),
+  getUnreadCount: () => api.get('/notifications/unread-count'),
+  markAsRead: (id) => api.patch(`/notifications/${id}/read`),
+  markAllAsRead: () => api.patch('/notifications/mark-all-read'),
+  deleteNotification: (id) => api.delete(`/notifications/${id}`),
+  sendSmsReminder: (data) => api.post('/notifications/sms', data)
+};
+
 // Order API
 export const orderAPI = {
   getMyOrders: (params) => api.get('/orders/my', { params }),

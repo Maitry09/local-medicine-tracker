@@ -42,7 +42,7 @@ export default function OrderDetails() {
     if (!window.confirm('Are you sure you want to cancel this order?')) return;
     
     try {
-      await api.put(`/orders/${id}/cancel`);
+      await api.patch(`/orders/${id}/cancel`);
       fetchOrderDetails();
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to cancel order');

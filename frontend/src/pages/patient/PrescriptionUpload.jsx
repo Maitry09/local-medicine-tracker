@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
 
@@ -25,12 +25,14 @@ export default function PrescriptionUpload() {
     try {
       const formData = new FormData();
       formData.append('prescription', file);
-      formData.append('orderId', orderId);
+      if (orderId) {
+        formData.append('orderId', orderId);
+      }
       await api.post('/prescriptions/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       showNotification('✅ Prescription uploaded! Pharmacy will review shortly.', 'success', 4000);
-      navigate(`/orders/${orderId}`);
+      navigate(orderId ? `/orders/${orderId}` : '/dashboard');
     } catch (err) {
       showNotification(err.response?.data?.message || 'Upload failed', 'error', 4000);
     } finally {
@@ -41,7 +43,11 @@ export default function PrescriptionUpload() {
   return (
     <div style={{ maxWidth: 520, margin: '2rem auto', padding: '0 1rem' }}>
       <h2>Upload Prescription</h2>
-      <p className="text-muted">Order #{orderId.slice(-8).toUpperCase()}</p>
+      {orderId ? (
+        <p className="text-muted">Order #{orderId.slice(-8).toUpperCase()}</p>
+      ) : (
+        <p className="text-muted">Upload a prescription for review without linking it to a specific order.</p>
+      )}
 
       <div className="card" style={{ marginTop: '1.5rem' }}>
         <div className="card-body">

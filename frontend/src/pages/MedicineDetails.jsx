@@ -88,47 +88,39 @@ const MedicineDetails = () => {
       setLoading(false);
     }
   };
- const handleAddToCart = () => {
+ const handleAddToCart = (pharmacy) => {
 
-  if (!selectedPharmacy) {
+  const selected = pharmacy || selectedPharmacy;
+
+  if (!selected) {
     error('Select pharmacy first');
     return;
   }
 
-  // FIXED PRICE
-  const fixedPrice = parseInt(
-    selectedPharmacy.price ||
-    medicine.price ||
-    medicine.mrp ||
-    0
+  const basePrice = Number(selected.price || medicine.price || medicine.mrp || 0);
+  const discount = Number(selected.discount || 0);
+  const fixedPrice = Number(
+    (basePrice * (1 - discount / 100)).toFixed(2)
   );
 
+  const pharmacyId = selected.pharmacy?._id || selected._id;
+  const pharmacyName = selected.pharmacy?.name || selected.name || 'Pharmacy';
+
   const cartItem = {
-
-    _id: `${medicine._id}-${selectedPharmacy._id}`,
-
+    _id: `${medicine._id}-${pharmacyId}`,
     medicineId: medicine._id,
-
-    pharmacyId: selectedPharmacy._id,
-
+    pharmacyId,
+    pharmacyName,
     name: medicine.name,
-
     image: medicine.image,
-
     quantity,
-
-    // IMPORTANT
     price: fixedPrice,
-
     pharmacyPrice: fixedPrice,
-
-    selectedStore: selectedPharmacy.name,
-
-    stock: selectedPharmacy.stock
+    selectedStore: pharmacyName,
+    stock: selected.stock
   };
 
   addToCart(cartItem);
-
   success('Added to cart');
 };
 
@@ -195,12 +187,6 @@ const MedicineDetails = () => {
               {medicine.description && (
                 <p className="text-muted">{medicine.description}</p>
               )}
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <p className="text-muted text-sm">MRP</p>
-              <p style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--primary)' }}>
-                Rs. {medicine.mrp}
-              </p>
             </div>
           </div>
         </div>

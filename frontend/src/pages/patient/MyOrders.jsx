@@ -17,28 +17,26 @@ export default function MyOrders() {
   }, []);
 
   const fetchOrders = async () => {
+    try {
+      setLoading(true);
 
-  try {
+      const response = await api.get('/orders/my-orders');
+      const backendOrders = response.data?.data?.orders || [];
 
-    setLoading(true);
-
-    // LOCAL ORDERS
-    const localOrders =
-      JSON.parse(
-        localStorage.getItem('orders')
-      ) || [];
-
-    setOrders(localOrders);
-
-  } catch (err) {
-
-    console.log(err);
-
-  } finally {
-
-    setLoading(false);
-  }
-};
+      if (backendOrders.length > 0) {
+        setOrders(backendOrders);
+      } else {
+        const localOrders = JSON.parse(localStorage.getItem('orders')) || [];
+        setOrders(localOrders);
+      }
+    } catch (err) {
+      console.error(err);
+      const localOrders = JSON.parse(localStorage.getItem('orders')) || [];
+      setOrders(localOrders);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // FILTER ORDERS
   const filteredOrders = useMemo(() => {
@@ -168,9 +166,9 @@ export default function MyOrders() {
       ) : (
         <>
           <div className="orders-list">
-            {paginatedOrders.map((order) => (
+            {paginatedOrders.map((order, index) => (
               <div
-                  key={`${order._id || order.id}-${order.index}`}
+                  key={order._id || order.id || `${order.orderNumber || 'order'}-${index}`}
                 className="order-card"
               >
                 {/* HEADER */}
@@ -247,17 +245,12 @@ export default function MyOrders() {
                 {/* FOOTER */}
                 <div className="order-footer">
                   <div className="order-total">
-                    <span className="label">
-                      Total:
-                    </span>
-
+                    <span className="label">Total:</span>
                     <span className="amount">
-                      ₹
-                      {order.totalAmount = order.items.reduce(
-                        (sum, item) =>
-                          sum + item.price * item.quantity,
+                      ₹{(order.total || order.totalAmount || order.items?.reduce(
+                        (sum, item) => sum + (item.price || 0) * (item.quantity || 0),
                         0
-                      )}
+                      )).toFixed(2)}
                     </span>
                   </div>
 

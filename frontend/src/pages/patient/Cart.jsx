@@ -46,6 +46,21 @@ export default function Cart() {
     {}
   );
 
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if (window.Razorpay) {
+        resolve(true);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const placeOrder = async (orderData) => {
 
     try {
@@ -100,12 +115,16 @@ export default function Cart() {
         pharmacyId: od.pharmacyId,
 
         items: od.items.map(item => ({
-          medicine: item.medicineId,
-          quantity: item.quantity,
-          price: Math.round(item.price)
-        })),
 
-        total: Math.round(od.total),
+        medicineId:
+          item.medicineId ||
+          item.medicine,
+
+        quantity: item.quantity,
+
+        price: Math.round(item.price)
+
+      })),
 
         deliveryType,
 
@@ -137,9 +156,15 @@ export default function Cart() {
 };
 
       if (paymentMethod === 'razorpay') {
+        const loaded = await loadRazorpayScript();
+        if (!loaded) {
+          error('Razorpay SDK failed to load');
+          return;
+        }
+
         const options = {
           key: import.meta.env.VITE_RAZORPAY_KEY,
-          amount: getCartTotal() * 100,
+          amount: Math.round(getCartTotal() * 100),
           currency: 'INR',
           name: 'Medicine Tracker',
           description: 'Medicine Order Payment',
@@ -247,7 +272,7 @@ export default function Cart() {
                       </h3>
 
                       <p className="price">
-                        ₹{Math.round(item.price || 0)}
+                        ₹{Number(item.price || 0).toFixed(2)}
                       </p>
 
                     </div>
@@ -322,7 +347,7 @@ export default function Cart() {
           <div className="summary-row total-row">
             <span>Total</span>
             <span>
-              ₹{getCartTotal().toFixed(2)}
+              ₹{Math.round(getCartTotal())}
             </span>
           </div>
           <div className="checkout-options">

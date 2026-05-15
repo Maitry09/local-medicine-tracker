@@ -9,7 +9,7 @@ const PharmacyDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { addItem } = useCart();
+  const { addToCart } = useCart();
   const { success } = useNotification();
   
   const [pharmacy, setPharmacy] = useState(null);
@@ -44,18 +44,26 @@ const PharmacyDetails = () => {
       return;
     }
 
-    const added = addItem(
-      {
-        medicineId: stockItem.medicine._id,
-        medicineName: stockItem.medicine.name,
-        genericName: stockItem.medicine.genericName,
-        price: stockItem.price,
-        discount: stockItem.discount || 0,
-        quantity: 1,
-        stockId: stockItem._id
-      },
-      pharmacy
-    );
+    const pharmacyId = pharmacy?._id;
+    const pharmacyName = pharmacy?.name || 'Pharmacy';
+    const basePrice = Number(stockItem.price || 0);
+    const discount = Number(stockItem.discount || 0);
+    const displayPrice = Number((basePrice * (1 - discount / 100)).toFixed(2));
+
+    const added = addToCart({
+      _id: `${stockItem.medicine._id}-${pharmacyId}`,
+      medicineId: stockItem.medicine._id,
+      pharmacyId,
+      pharmacyName,
+      name: stockItem.medicine.name,
+      image: stockItem.medicine.image,
+      quantity: 1,
+      price: displayPrice,
+      pharmacyPrice: displayPrice,
+      discount,
+      selectedStore: pharmacyName,
+      stock: stockItem.quantity
+    });
 
     if (added) {
       success(`${stockItem.medicine.name} added to cart`);

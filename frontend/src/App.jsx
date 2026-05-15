@@ -144,7 +144,7 @@ function App() {
           />
 
           <Route
-            path="/patient/prescription-upload"
+            path="/patient/prescription-upload/:id?"
             element={<PrescriptionUpload />}
           />
         </Route>

@@ -156,10 +156,6 @@ const SearchMedicines = () => {
                     {medicine.genericName && <p className="medicine-generic">{medicine.genericName}</p>}
                     <p className="text-sm text-muted mb-2">{medicine.manufacturer}</p>
                     <p className="text-sm text-muted mb-3">{medicine.dosageForm} - {medicine.strength}</p>
-                    <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                      <span className="medicine-price">Rs. {medicine.mrp}</span>
-                      <span className="text-sm text-muted" style={{ marginLeft: 'auto' }}>MRP</span>
-                    </div>
                   </div>
                   <div className="card-footer">
                     <span className="text-primary text-sm font-bold">Check Availability &rarr;</span>
