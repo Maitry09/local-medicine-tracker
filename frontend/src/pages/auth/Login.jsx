@@ -74,7 +74,7 @@ const Login = () => {
         <div className="form-group">
           <label htmlFor="password" className="form-label">Password</label>
           <input type="password" id="password" name="password" value={formData.password} onChange={handleChange}
-            placeholder="Enter your password" className={`form-input ${errors.password ? 'input-error' : ''}`} required />
+            placeholder="Enter your password" className={`form-input ${errors.password ? 'input-error' : ''}`} autoComplete="current-password" required />
           {errors.password && <small className="error-text">{errors.password}</small>}
         </div>
 

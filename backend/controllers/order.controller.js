@@ -221,6 +221,11 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
   );
 
   await order.populate(
+    'user',
+    'name email phone'
+  );
+
+  await order.populate(
     'items.medicine',
     'name'
   );

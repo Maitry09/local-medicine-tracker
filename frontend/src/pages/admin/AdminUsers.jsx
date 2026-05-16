@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { adminAPI } from '../../services/api';
+import { userAPI } from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
 
 const AdminUsers = () => {
@@ -22,9 +22,9 @@ const AdminUsers = () => {
       if (roleFilter !== 'all') params.role = roleFilter;
       if (searchTerm) params.search = searchTerm;
       
-      const response = await adminAPI.getUsers(params);
-      setUsers(response.data.users);
-      setTotalPages(response.data.totalPages || 1);
+      const response = await userAPI.getAll(params);
+      setUsers(response.data?.data?.users || []);
+      setTotalPages(response.data?.data?.pagination?.pages || 1);
     } catch (error) {
       showNotification('Failed to fetch users', 'error');
     } finally {

@@ -19,21 +19,8 @@ api.interceptors.request.use((req) => {
 
 // Response interceptor - handle token refresh
 api.interceptors.response.use(
-  (response) => {
-    console.log('📥 API Response:', {
-      status: response.status,
-      url: response.config.url,
-      hasData: !!response.data
-    });
-    return response;
-  },
+  (response) => response,
   async (error) => {
-    console.error('❌ API Error:', {
-      status: error.response?.status,
-      url: error.config?.url,
-      message: error.response?.data?.message || error.message
-    });
-    
     const originalRequest = error.config;
 
     // If 401 and we haven't tried refreshing yet
@@ -91,6 +78,8 @@ export const authAPI = {
 // Medicine API
 export const medicineAPI = {
   search: (params) => api.get('/medicines/search', { params }),
+  getAll: (params) => api.get('/medicines/search', { params }),
+  getMedicines: (params) => api.get('/medicines/search', { params }),
   getById: (id) => api.get(`/medicines/${id}`),
   getAvailability: (id, params) => api.get(`/medicines/${id}/availability`, { params }),
   getCategories: () => api.get('/medicines/categories'),
@@ -116,8 +105,12 @@ export const pharmacyAPI = {
 // Stock API
 export const stockAPI = {
   getMyStock: (params) => api.get('/stock', { params }),
+  getStocks: (params) => api.get('/stock', { params }),
+  addStock: (data) => api.post('/stock', data),
   add: (data) => api.post('/stock', data),
+  updateStock: (id, data) => api.put(`/stock/${id}`, data),
   update: (id, data) => api.put(`/stock/${id}`, data),
+  deleteStock: (id) => api.delete(`/stock/${id}`),
   delete: (id) => api.delete(`/stock/${id}`),
   bulkUpdate: (items) => api.post('/stock/bulk', { items })
 };
@@ -144,19 +137,24 @@ export const notificationAPI = {
 
 // Order API
 export const orderAPI = {
-  getMyOrders: (params) => api.get('/orders/my', { params }),
+  getMyOrders: (params) => api.get('/orders/my-orders', { params }),
   getById: (id) => api.get(`/orders/${id}`),
+  createOrder: (data) => api.post('/orders', data),
   create: (data) => api.post('/orders', data),
+  cancelOrder: (id, reason) => api.patch(`/orders/${id}/cancel`, { reason }),
   cancel: (id, reason) => api.patch(`/orders/${id}/cancel`, { reason }),
   getPharmacyOrders: (params) => api.get('/orders/pharmacy/orders', { params }),
+  updateOrderStatus: (id, status) => api.patch(`/orders/${id}/status`, { status }),
   updateStatus: (id, data) => api.patch(`/orders/${id}/status`, data),
   getAllOrders: (params) => api.get('/orders/admin/all', { params })
 };
 
 // Payment API
 export const paymentAPI = {
+  createRazorpayOrder: (orderId) => api.post('/payments/razorpay/create-order', { orderId }),
   createOrder: (orderId) => api.post('/payments/create-order', { orderId }),
   verify: (data) => api.post('/payments/verify', data),
+  verifyPayment: (data) => api.post('/payments/verify', data),
   getByOrderId: (orderId) => api.get(`/payments/order/${orderId}`),
   requestRefund: (orderId, reason) => api.post('/payments/refund', { orderId, reason })
 };

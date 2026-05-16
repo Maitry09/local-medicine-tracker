@@ -16,7 +16,7 @@ const PharmacyOrders = () => {
   const fetchOrders = async () => {
     try {
       const response = await orderAPI.getPharmacyOrders();
-      setOrders(response.data.orders);
+      setOrders(response.data?.data?.orders || response.data?.orders || []);
     } catch (error) {
       showNotification('Failed to fetch orders', 'error');
     } finally {
@@ -26,12 +26,24 @@ const PharmacyOrders = () => {
 
   const handleStatusUpdate = async (orderId, newStatus) => {
     try {
-      await orderAPI.updateOrderStatus(orderId, newStatus);
+      const response = await orderAPI.updateOrderStatus(orderId, newStatus);
       showNotification('Order status updated', 'success');
+      setSelectedOrder((prev) => ({
+        ...prev,
+        ...(response.data?.data?.order || {}),
+      }));
       fetchOrders();
     } catch (error) {
       showNotification('Failed to update order status', 'error');
     }
+  };
+
+  const getOrderTotal = (order) => {
+    const totalFromItems = order.items?.reduce(
+      (sum, item) => sum + Number(item.price ?? 0) * Number(item.quantity ?? 0),
+      0
+    );
+    return Number(order.totalAmount ?? order.total ?? totalFromItems ?? 0);
   };
 
   const getStatusBadge = (status) => {
@@ -111,12 +123,12 @@ const PharmacyOrders = () => {
                     <span className={getStatusBadge(order.status)}>{order.status}</span>
                   </div>
                   <div className="order-customer">
-                    <strong>{order.customer?.name}</strong>
-                    <span>{order.customer?.phone}</span>
+                    <strong>{order.user?.name || order.customer?.name || 'Unknown Customer'}</strong>
+                    <span>{order.user?.phone || order.customer?.phone || '-'}</span>
                   </div>
                   <div className="order-meta">
-                    <span>{order.items.length} items</span>
-                    <span>Rs. {order.totalAmount.toFixed(2)}</span>
+                    <span>{order.items?.length || 0} items</span>
+                    <span>Rs. {getOrderTotal(order).toFixed(2)}</span>
                   </div>
                   <div className="order-date">
                     {new Date(order.createdAt).toLocaleDateString('en-IN', {
@@ -144,26 +156,30 @@ const PharmacyOrders = () => {
             <div className="panel-content">
               <section>
                 <h3>Customer Details</h3>
-                <p><strong>Name:</strong> {selectedOrder.customer?.name}</p>
-                <p><strong>Phone:</strong> {selectedOrder.customer?.phone}</p>
-                <p><strong>Email:</strong> {selectedOrder.customer?.email}</p>
+                <p><strong>Name:</strong> {selectedOrder.user?.name || selectedOrder.customer?.name || 'Unknown'}</p>
+                <p><strong>Phone:</strong> {selectedOrder.user?.phone || selectedOrder.customer?.phone || '-'}</p>
+                <p><strong>Email:</strong> {selectedOrder.user?.email || selectedOrder.customer?.email || '-'}</p>
               </section>
 
               <section>
                 <h3>Delivery Address</h3>
-                <p>{selectedOrder.deliveryAddress?.street}</p>
-                <p>{selectedOrder.deliveryAddress?.city}, {selectedOrder.deliveryAddress?.state}</p>
-                <p>PIN: {selectedOrder.deliveryAddress?.pincode}</p>
+                <p>{selectedOrder.deliveryAddress?.street || '-'}</p>
+                <p>
+                  {selectedOrder.deliveryAddress?.city || '-'}{
+                    selectedOrder.deliveryAddress?.state ? `, ${selectedOrder.deliveryAddress.state}` : ''
+                  }
+                </p>
+                <p>PIN: {selectedOrder.deliveryAddress?.pincode || '-'}</p>
               </section>
 
               <section>
                 <h3>Order Items</h3>
                 <div className="items-list">
-                  {selectedOrder.items.map((item, index) => (
+                  {(selectedOrder.items || []).map((item, index) => (
                     <div key={index} className="item-row">
                       <span className="item-name">{item.medicine?.name}</span>
-                      <span className="item-qty">x{item.quantity}</span>
-                      <span className="item-price">Rs. {(item.price * item.quantity).toFixed(2)}</span>
+                      <span className="item-qty">x{item.quantity ?? 0}</span>
+                      <span className="item-price">Rs. {(Number(item.price ?? 0) * Number(item.quantity ?? 0)).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
@@ -178,7 +194,7 @@ const PharmacyOrders = () => {
                     {selectedOrder.paymentStatus}
                   </span>
                 </p>
-                <p><strong>Total:</strong> Rs. {selectedOrder.totalAmount.toFixed(2)}</p>
+                <p><strong>Total:</strong> Rs. {getOrderTotal(selectedOrder).toFixed(2)}</p>
               </section>
 
               {selectedOrder.status !== 'delivered' && selectedOrder.status !== 'cancelled' && (

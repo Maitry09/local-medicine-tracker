@@ -41,11 +41,6 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     .populate('user')
     .populate('pharmacy')
     .populate('items.medicine');
-  sendSuccess(res, 200, {
-    users,
-    pharmacies,
-    orders
-  });
 
   // Get recent orders
   const recentOrders = await Order.find()

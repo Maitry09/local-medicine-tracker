@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { pharmacyAPI, orderAPI } from '../../services/api';
+import { pharmacyAPI, orderAPI, stockAPI } from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
 
 const PharmacyDashboard = () => {
@@ -23,21 +23,21 @@ const PharmacyDashboard = () => {
     try {
       const [ordersRes, stockRes] = await Promise.all([
         orderAPI.getPharmacyOrders({ limit: 5 }),
-        pharmacyAPI.getMyPharmacyStock(),
+        stockAPI.getStocks(),
       ]);
 
-      const orders = ordersRes.data.orders;
-      const stock = stockRes.data.stocks;
+      const orders = ordersRes.data?.data?.orders || ordersRes.data?.orders || [];
+      const stock = stockRes.data?.data?.stock || stockRes.data?.data?.stocks || [];
 
       setRecentOrders(orders);
       setStats({
         totalOrders: ordersRes.data.total || orders.length,
         pendingOrders: orders.filter((o) => o.status === 'pending').length,
         totalStock: stock.length,
-        lowStockItems: stock.filter((s) => s.quantity <= s.lowStockThreshold).length,
+        lowStockItems: stock.filter((s) => Number(s.quantity ?? 0) <= Number(s.lowStockThreshold ?? 0)).length,
         revenue: orders
           .filter((o) => o.paymentStatus === 'paid')
-          .reduce((sum, o) => sum + o.totalAmount, 0),
+          .reduce((sum, o) => sum + Number(o.totalAmount ?? o.total ?? 0), 0),
       });
     } catch (error) {
       showNotification('Failed to fetch dashboard data', 'error');
@@ -124,7 +124,7 @@ const PharmacyDashboard = () => {
           </div>
           <div className="stat-content">
             <h3>Revenue</h3>
-            <p className="stat-value">Rs. {stats.revenue.toFixed(2)}</p>
+            <p className="stat-value">Rs. {(Number(stats.revenue) || 0).toFixed(2)}</p>
           </div>
         </div>
       </div>
@@ -155,8 +155,8 @@ const PharmacyDashboard = () => {
                   {recentOrders.map((order) => (
                     <tr key={order._id}>
                       <td>#{order._id.slice(-8).toUpperCase()}</td>
-                      <td>{order.customer?.name}</td>
-                      <td>Rs. {order.totalAmount.toFixed(2)}</td>
+                      <td>{order.user?.name || order.customer?.name || '-'}</td>
+                      <td>Rs. {Number(order.totalAmount ?? order.total ?? 0).toFixed(2)}</td>
                       <td>
                         <span className={getStatusBadge(order.status)}>{order.status}</span>
                       </td>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { pharmacyAPI, stockAPI, medicineAPI } from '../../services/api';
+import api, { pharmacyAPI, stockAPI, medicineAPI } from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
 
 const PharmacyStock = () => {
@@ -26,13 +26,20 @@ const PharmacyStock = () => {
   }, []);
 
   const fetchData = async () => {
-  try {
-    const res = await api.get('/stock');
-    setStock(res.data.data.stock);
-  } catch (err) {
-    console.log(err);
-  }
-};
+    try {
+      setLoading(true);
+      const [stockRes, medsRes] = await Promise.all([
+        stockAPI.getStocks(),
+        medicineAPI.getMedicines()
+      ]);
+      setStocks(stockRes.data?.data?.stock || stockRes.data?.data?.stocks || []);
+      setMedicines(medsRes.data?.data?.medicines || medsRes.data?.data?.medicine || []);
+    } catch (err) {
+      showNotification('Failed to fetch data', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAddStock = async (e) => {
     e.preventDefault();
@@ -41,7 +48,7 @@ const PharmacyStock = () => {
       showNotification('Stock added successfully', 'success');
       setShowAddModal(false);
       resetForm();
-      fetchData();
+      await fetchData();
     } catch (error) {
       showNotification(error.response?.data?.message || 'Failed to add stock', 'error');
     }
@@ -55,7 +62,7 @@ const PharmacyStock = () => {
       setShowEditModal(false);
       setSelectedStock(null);
       resetForm();
-      fetchData();
+      await fetchData();
     } catch (error) {
       showNotification(error.response?.data?.message || 'Failed to update stock', 'error');
     }
@@ -66,7 +73,7 @@ const PharmacyStock = () => {
     try {
       await stockAPI.deleteStock(stockId);
       showNotification('Stock deleted successfully', 'success');
-      fetchData();
+      await fetchData();
     } catch (error) {
       showNotification('Failed to delete stock', 'error');
     }
@@ -75,10 +82,10 @@ const PharmacyStock = () => {
   const openEditModal = (stock) => {
     setSelectedStock(stock);
     setFormData({
-      medicine: stock.medicine._id,
-      quantity: stock.quantity.toString(),
-      price: stock.price.toString(),
-      lowStockThreshold: stock.lowStockThreshold.toString(),
+      medicine: stock.medicine?._id || stock.medicine || '',
+      quantity: String(stock.quantity ?? ''),
+      price: String(stock.price ?? ''),
+      lowStockThreshold: String(stock.lowStockThreshold ?? '10'),
       expiryDate: stock.expiryDate ? stock.expiryDate.split('T')[0] : '',
       batchNumber: stock.batchNumber || '',
     });
@@ -150,8 +157,8 @@ const PharmacyStock = () => {
                     <span>{stock.medicine?.manufacturer}</span>
                   </div>
                 </td>
-                <td>{stock.quantity}</td>
-                <td>Rs. {stock.price.toFixed(2)}</td>
+                <td>{stock.quantity ?? '-'}</td>
+                <td>Rs. {(Number(stock.price) || 0).toFixed(2)}</td>
                 <td>{stock.batchNumber || '-'}</td>
                 <td>
                   {stock.expiryDate
@@ -161,9 +168,9 @@ const PharmacyStock = () => {
                 <td>
                   <span
                     className={`badge ${
-                      stock.quantity === 0
+                      Number(stock.quantity ?? 0) === 0
                         ? 'badge-danger'
-                        : stock.quantity <= stock.lowStockThreshold
+                        : Number(stock.quantity ?? 0) <= Number(stock.lowStockThreshold ?? 0)
                         ? 'badge-warning'
                         : 'badge-success'
                     }`}

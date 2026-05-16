@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { adminAPI } from '../../services/api';
+import { orderAPI } from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
 
 const AdminOrders = () => {
@@ -21,9 +21,9 @@ const AdminOrders = () => {
       const params = { page, limit: 20 };
       if (filter !== 'all') params.status = filter;
       
-      const response = await adminAPI.getAllOrders(params);
-      setOrders(response.data.orders);
-      setTotalPages(response.data.totalPages || 1);
+      const response = await orderAPI.getAllOrders(params);
+      setOrders(response.data?.data?.orders || []);
+      setTotalPages(response.data?.data?.pagination?.pages || 1);
     } catch (error) {
       showNotification('Failed to fetch orders', 'error');
     } finally {

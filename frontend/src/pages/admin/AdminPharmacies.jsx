@@ -20,8 +20,8 @@ const AdminPharmacies = () => {
       if (filter === 'pending') params.isVerified = false;
       if (filter === 'verified') params.isVerified = true;
       
-      const response = await adminAPI.getPharmacies(params);
-      setPharmacies(response.data.pharmacies);
+      const response = await adminAPI.getAllPharmacies(params);
+      setPharmacies(response.data?.data?.pharmacies || []);
     } catch (error) {
       showNotification('Failed to fetch pharmacies', 'error');
     } finally {
@@ -31,7 +31,7 @@ const AdminPharmacies = () => {
 
   const handleVerify = async (pharmacyId) => {
     try {
-      await adminAPI.verifyPharmacy(pharmacyId);
+      await adminAPI.updatePharmacy(pharmacyId, { isVerified: true });
       showNotification('Pharmacy verified successfully', 'success');
       fetchPharmacies();
     } catch (error) {
@@ -44,7 +44,7 @@ const AdminPharmacies = () => {
     if (!reason) return;
     
     try {
-      await adminAPI.rejectPharmacy(pharmacyId, reason);
+      await adminAPI.updatePharmacy(pharmacyId, { isVerified: false, isActive: false });
       showNotification('Pharmacy rejected', 'success');
       fetchPharmacies();
     } catch (error) {
@@ -54,7 +54,7 @@ const AdminPharmacies = () => {
 
   const handleToggleStatus = async (pharmacyId, currentStatus) => {
     try {
-      await adminAPI.updatePharmacyStatus(pharmacyId, !currentStatus);
+      await adminAPI.updatePharmacy(pharmacyId, { isActive: !currentStatus });
       showNotification('Pharmacy status updated', 'success');
       fetchPharmacies();
     } catch (error) {

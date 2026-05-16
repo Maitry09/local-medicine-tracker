@@ -247,10 +247,7 @@ export default function MyOrders() {
                   <div className="order-total">
                     <span className="label">Total:</span>
                     <span className="amount">
-                      ₹{(order.total || order.totalAmount || order.items?.reduce(
-                        (sum, item) => sum + (item.price || 0) * (item.quantity || 0),
-                        0
-                      )).toFixed(2)}
+                      ₹{(order.total || 0).toFixed(2)}
                     </span>
                   </div>
 

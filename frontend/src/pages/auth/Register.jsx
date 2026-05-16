@@ -197,6 +197,7 @@ const Register = () => {
             onChange={handleChange}
             placeholder="Create a password (min 6 chars)"
             className={`form-input ${errors.password ? 'input-error' : ''}`}
+            autoComplete="new-password"
             required
           />
           {errors.password && <small className="error-text">{errors.password}</small>}
@@ -208,6 +209,7 @@ const Register = () => {
             type="password"
             id="confirmPassword"
             name="confirmPassword"
+            autoComplete="new-password"
             value={formData.confirmPassword}
             onChange={handleChange}
             placeholder="Confirm your password"

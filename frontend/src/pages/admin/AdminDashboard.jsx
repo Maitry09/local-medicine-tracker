@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import api, { adminAPI } from '../../services/api';
+import { adminAPI } from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
 
 const AdminDashboard = () => {
@@ -16,16 +16,46 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const { showNotification } = useNotification();
 
+  const getActivityMessage = (activity) => {
+    if (activity.message) return activity.message;
+    if (activity.orderNumber) {
+      return `Order #${activity.orderNumber.slice(-8).toUpperCase()} ${activity.status ? `is ${activity.status}` : 'updated'}`;
+    }
+    if (activity.name) {
+      return `${activity.name} activity recorded`;
+    }
+    return 'Recent activity';
+  };
+
+  const getActivityTime = (activity) => {
+    const dateString = activity.createdAt || activity.timestamp || activity.date;
+    const date = new Date(dateString);
+    return Number.isNaN(date.getTime()) ? 'Unknown time' : date.toLocaleString();
+  };
+
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
   const fetchDashboardData = async () => {
     try {
-      const res = await api.get('/admin/dashboard');
-      setDashboard(res.data.data);
+      const res = await adminAPI.getDashboardStats();
+      const data = res.data?.data || {};
+      setStats({
+        totalUsers: data.users?.total || 0,
+        totalPharmacies: data.pharmacies?.total || 0,
+        totalMedicines: data.medicines || 0,
+        totalOrders: data.orders?.total || 0,
+        pendingApprovals: data.pharmacies?.total && data.pharmacies?.verified !== undefined
+          ? data.pharmacies.total - data.pharmacies.verified
+          : 0,
+        revenue: data.revenue?.total || 0,
+      });
+      setRecentActivity(data.recentOrders || []);
     } catch (err) {
-      console.log(err);
+      showNotification('Failed to fetch dashboard data', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -168,9 +198,9 @@ const AdminDashboard = () => {
                     <span className={`dot ${activity.type}`}></span>
                   </div>
                   <div className="activity-content">
-                    <p>{activity.message}</p>
+                    <p>{getActivityMessage(activity)}</p>
                     <span className="activity-time">
-                      {new Date(activity.timestamp).toLocaleString()}
+                      {getActivityTime(activity)}
                     </span>
                   </div>
                 </div>

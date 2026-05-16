@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { adminAPI, medicineAPI } from '../../services/api';
+import { medicineAPI } from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
 
 const AdminMedicines = () => {
@@ -37,8 +37,8 @@ const AdminMedicines = () => {
       if (searchTerm) params.search = searchTerm;
       
       const response = await medicineAPI.getMedicines(params);
-      setMedicines(response.data.medicines);
-      setTotalPages(response.data.totalPages || 1);
+      setMedicines(response.data?.data?.medicines || []);
+      setTotalPages(response.data?.data?.pagination?.pages || 1);
     } catch (error) {
       showNotification('Failed to fetch medicines', 'error');
     } finally {
@@ -56,10 +56,10 @@ const AdminMedicines = () => {
     e.preventDefault();
     try {
       if (editingMedicine) {
-        await adminAPI.updateMedicine(editingMedicine._id, formData);
+        await medicineAPI.update(editingMedicine._id, formData);
         showNotification('Medicine updated successfully', 'success');
       } else {
-        await adminAPI.createMedicine(formData);
+        await medicineAPI.create(formData);
         showNotification('Medicine created successfully', 'success');
       }
       setShowModal(false);
@@ -91,7 +91,7 @@ const AdminMedicines = () => {
   const handleDelete = async (medicineId) => {
     if (!window.confirm('Are you sure you want to delete this medicine?')) return;
     try {
-      await adminAPI.deleteMedicine(medicineId);
+      await medicineAPI.delete(medicineId);
       showNotification('Medicine deleted', 'success');
       fetchMedicines();
     } catch (error) {

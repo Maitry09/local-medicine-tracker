@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Link,
   useNavigate
 } from 'react-router-dom';
 
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
 
@@ -22,8 +23,27 @@ export default function Cart() {
     getCartTotal
     } = useCart();
   const { success, error } = useNotification();
+  const { user } = useAuth();
   const [deliveryType, setDeliveryType] = useState('pickup');
   const [paymentMethod, setPaymentMethod] = useState('cod');
+  const [deliveryAddress, setDeliveryAddress] = useState({
+    street: user?.address?.street || '',
+    city: user?.address?.city || '',
+    state: user?.address?.state || '',
+    pincode: user?.address?.pincode || ''
+  });
+
+  useEffect(() => {
+    if (user?.address) {
+      setDeliveryAddress({
+        street: user.address.street || '',
+        city: user.address.city || '',
+        state: user.address.state || '',
+        pincode: user.address.pincode || ''
+      });
+    }
+  }, [user]);
+
   const groupedItems = cartItems.reduce(
     (groups, item) => {
 
@@ -55,9 +75,14 @@ export default function Cart() {
 
       const script = document.createElement('script');
       script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
       script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
+      script.onerror = () => {
+        console.error('Failed to load Razorpay SDK');
+        resolve(false);
+      };
+      script.crossOrigin = 'anonymous';
+      document.head.appendChild(script);
     });
   };
 
@@ -79,6 +104,18 @@ export default function Cart() {
 
   const handleCheckout = async () => {
 
+    if (deliveryType === 'delivery') {
+      if (
+        !deliveryAddress.street.trim() ||
+        !deliveryAddress.city.trim() ||
+        !deliveryAddress.state.trim() ||
+        !deliveryAddress.pincode.trim()
+      ) {
+        error('Delivery address and pincode are required for home delivery');
+        return;
+      }
+    }
+
     const existingOrders =
       JSON.parse(
         localStorage.getItem('orders')
@@ -94,7 +131,8 @@ export default function Cart() {
           })),
           total: pharmacy.items.reduce((s, it) => s + ((it.price || 0) * it.quantity), 0),
           deliveryType,
-          paymentMethod
+          paymentMethod,
+          deliveryAddress: deliveryType === 'delivery' ? deliveryAddress : undefined
         })
       );
 
@@ -111,27 +149,16 @@ export default function Cart() {
     for (const od of orders) {
 
       const payload = {
-
         pharmacyId: od.pharmacyId,
-
         items: od.items.map(item => ({
-
-        medicineId:
-          item.medicineId ||
-          item.medicine,
-
-        quantity: item.quantity,
-
-        price: Math.round(item.price)
-
-      })),
-
+          medicineId: item.medicineId || item.medicine,
+          quantity: item.quantity,
+          price: Math.round(item.price)
+        })),
         deliveryType,
-
         paymentMethod,
-
+        deliveryAddress: od.deliveryAddress || null,
         paymentStatus,
-
         razorpayPaymentId
       };
 
@@ -156,6 +183,12 @@ export default function Cart() {
 };
 
       if (paymentMethod === 'razorpay') {
+        const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
+        if (!razorpayKey) {
+          error('Payment configuration error: Razorpay key not found');
+          return;
+        }
+
         const loaded = await loadRazorpayScript();
         if (!loaded) {
           error('Razorpay SDK failed to load');
@@ -163,16 +196,26 @@ export default function Cart() {
         }
 
         const options = {
-          key: import.meta.env.VITE_RAZORPAY_KEY,
+          key: razorpayKey,
           amount: Math.round(getCartTotal() * 100),
           currency: 'INR',
           name: 'Medicine Tracker',
           description: 'Medicine Order Payment',
+          prefill: {
+            name: user?.name || '',
+            email: user?.email || '',
+            contact: user?.phone || ''
+          },
           handler: async function(response) {
             try {
               await finalizeOrders(ordersToPlace, 'paid', response.razorpay_payment_id);
             } catch (err) {
               // error already shown in placeOrder
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              error('Payment cancelled');
             }
           }
         };
@@ -371,6 +414,40 @@ export default function Cart() {
             <option value="cod">Cash on Delivery</option>
             <option value="razorpay">Razorpay</option>
           </select>
+
+          {deliveryType === 'delivery' && (
+            <div className="address-fields">
+              <h3>Delivery Address</h3>
+              <input
+                type="text"
+                placeholder="Street address"
+                value={deliveryAddress.street}
+                onChange={(e) => setDeliveryAddress({ ...deliveryAddress, street: e.target.value })}
+                required
+              />
+              <input
+                type="text"
+                placeholder="City"
+                value={deliveryAddress.city}
+                onChange={(e) => setDeliveryAddress({ ...deliveryAddress, city: e.target.value })}
+                required
+              />
+              <input
+                type="text"
+                placeholder="State"
+                value={deliveryAddress.state}
+                onChange={(e) => setDeliveryAddress({ ...deliveryAddress, state: e.target.value })}
+                required
+              />
+              <input
+                type="text"
+                placeholder="Pincode"
+                value={deliveryAddress.pincode}
+                onChange={(e) => setDeliveryAddress({ ...deliveryAddress, pincode: e.target.value })}
+                required
+              />
+            </div>
+          )}
 
           <div>
             <span className="delivery-badge">

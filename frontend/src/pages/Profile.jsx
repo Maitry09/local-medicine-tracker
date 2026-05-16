@@ -242,6 +242,7 @@ const Profile = () => {
                   onChange={(e) =>
                     setPasswordData({ ...passwordData, currentPassword: e.target.value })
                   }
+                  autoComplete="current-password"
                   required
                 />
               </div>
@@ -253,6 +254,7 @@ const Profile = () => {
                   onChange={(e) =>
                     setPasswordData({ ...passwordData, newPassword: e.target.value })
                   }
+                  autoComplete="new-password"
                   required
                 />
               </div>
@@ -264,6 +266,7 @@ const Profile = () => {
                   onChange={(e) =>
                     setPasswordData({ ...passwordData, confirmPassword: e.target.value })
                   }
+                  autoComplete="new-password"
                   required
                 />
               </div>

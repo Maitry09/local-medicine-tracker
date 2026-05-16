@@ -172,11 +172,7 @@ export default function OrderDetails() {
               </div>
               <div className="summary-row total">
                 <span>Total</span>
-                <span>₹{order.totalAmount = order.items.reduce(
-                        (sum, item) =>
-                          sum + item.price * item.quantity,
-                        0
-                      )}</span>
+                <span>₹{order.total?.toFixed(2)}</span>
               </div>
             </div>
           </div>
