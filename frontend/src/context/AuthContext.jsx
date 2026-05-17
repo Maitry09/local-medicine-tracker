@@ -13,7 +13,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
   const [token, setToken] = useState(
-    localStorage.getItem('token')
+    localStorage.getItem('accessToken') || localStorage.getItem('token')
   );
 
   const [loading, setLoading] = useState(true);
@@ -56,10 +56,9 @@ export const AuthProvider = ({ children }) => {
       const data = response.data.data;
 
       // save token
-      localStorage.setItem(
-        'token',
-        data.accessToken
-      );
+      localStorage.setItem('accessToken', data.accessToken);
+      localStorage.setItem('token', data.accessToken);
+      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
 
       // update state
       setToken(data.accessToken);
@@ -72,9 +71,30 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // REGISTER
+  const register = async (payload) => {
+    try {
+      const response = await authAPI.register(payload);
+      const data = response.data.data;
+
+      localStorage.setItem('accessToken', data.accessToken);
+      localStorage.setItem('token', data.accessToken);
+      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+
+      setToken(data.accessToken);
+      setUser(data.user);
+
+      return data.user;
+    } catch (err) {
+      throw err;
+    }
+  };
+
   // LOGOUT
   const logout = () => {
+    localStorage.removeItem('accessToken');
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
 
     setToken(null);
     setUser(null);
@@ -87,6 +107,7 @@ export const AuthProvider = ({ children }) => {
         token,
         loading,
         login,
+        register,
         logout,
         setUser
       }}

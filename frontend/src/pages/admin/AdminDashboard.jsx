@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { adminAPI } from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
+import '../../styles/admin.css';
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState({
@@ -28,9 +29,30 @@ const AdminDashboard = () => {
   };
 
   const getActivityTime = (activity) => {
-    const dateString = activity.createdAt || activity.timestamp || activity.date;
+    const dateString = activity.createdAt || activity.timestamp || activity.date || activity.updatedAt;
+    if (!dateString) return 'Recently';
+    
     const date = new Date(dateString);
-    return Number.isNaN(date.getTime()) ? 'Unknown time' : date.toLocaleString();
+    if (isNaN(date.getTime())) return 'Recently';
+    
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    
+    return date.toLocaleDateString('en-IN', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   useEffect(() => {

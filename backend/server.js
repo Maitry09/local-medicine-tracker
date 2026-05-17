@@ -20,6 +20,8 @@ import paymentRoutes from './routes/payment.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import prescriptionRoutes from './routes/prescription.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
+import savedMedicineRoutes from './routes/savedMedicine.routes.js';
+import reviewRoutes from './routes/review.routes.js';
 
 // Load environment variables
 dotenv.config();
@@ -174,6 +176,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/prescriptions', prescriptionRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/saved-medicines', savedMedicineRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 // Welcome route
 app.get('/', (req, res) => {

@@ -7,10 +7,12 @@ import {
   logout,
   getMe,
   updateProfile,
-  changePassword
+  changePassword,
+  forgotPassword,
+  resetPassword
 } from '../controllers/auth.controller.js';
 import { authMiddleware } from '../middleware/auth.middleware.js';
-import { registerValidation, loginValidation, validate } from '../middleware/validation.middleware.js';
+import { registerValidation, loginValidation, forgotPasswordValidation, resetPasswordValidation, validate } from '../middleware/validation.middleware.js';
 
 const router = express.Router();
 const authLimiter = rateLimit({
@@ -30,6 +32,8 @@ const authLimiter = rateLimit({
 router.post('/register', authLimiter, registerValidation, validate, register);
 router.post('/login', authLimiter, loginValidation, validate, login);
 router.post('/refresh-token', refreshToken);
+router.post('/forgot-password', authLimiter, forgotPasswordValidation, validate, forgotPassword);
+router.post('/reset-password', authLimiter, resetPasswordValidation, validate, resetPassword);
 
 // Protected routes
 router.post('/logout', authMiddleware, logout);

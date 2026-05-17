@@ -17,6 +17,9 @@ const router = express.Router();
 router.post('/setup', createAdminUser);
 router.post('/seed-medicines', authMiddleware, requireRole('admin'), seedMedicines);
 
+// Allow admins to create additional admin users
+router.post('/admins', authMiddleware, requireRole('admin'), createAdminUser);
+
 // Protected admin routes
 router.use(authMiddleware);
 router.use(requireRole('admin'));

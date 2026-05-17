@@ -1,5 +1,6 @@
 import Pharmacy from '../models/Pharmacy.js';
 import User from '../models/User.js';
+import Notification from '../models/Notification.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
 import Stock from '../models/Stock.js';
 
@@ -10,7 +11,6 @@ export const getAllPharmacies = asyncHandler(async (req, res) => {
     page = 1,
     limit = 10,
     city,
-    isVerified,
     is24Hours,
     lat,
     lng,
@@ -18,10 +18,9 @@ export const getAllPharmacies = asyncHandler(async (req, res) => {
     search
   } = req.query;
 
-  const query = { isActive: true };
+  const query = { isActive: true, status: 'approved' };
 
   if (city) query['address.city'] = { $regex: city, $options: 'i' };
-  if (isVerified !== undefined) query.isVerified = isVerified === 'true';
   if (is24Hours !== undefined) query['operatingHours.is24Hours'] = is24Hours === 'true';
   if (search) {
     query.$or = [
@@ -41,9 +40,8 @@ export const getAllPharmacies = asyncHandler(async (req, res) => {
     const maxDistanceMeters = parseFloat(radius) * 1000; // convert km to meters
 
     // Build match stage for additional filters
-    const matchStage = { isActive: true };
+    const matchStage = { isActive: true, status: 'approved' };
     if (city) matchStage['address.city'] = { $regex: city, $options: 'i' };
-    if (isVerified !== undefined) matchStage.isVerified = isVerified === 'true';
     if (is24Hours !== undefined) matchStage['operatingHours.is24Hours'] = is24Hours === 'true';
     if (search) {
       matchStage.$or = [
@@ -248,7 +246,7 @@ export const getMyPharmacy = asyncHandler(async (req, res) => {
 export const verifyPharmacy = asyncHandler(async (req, res) => {
   const pharmacy = await Pharmacy.findByIdAndUpdate(
     req.params.id,
-    { isVerified: true },
+    { status: 'approved', isVerified: true, rejectionReason: undefined },
     { new: true }
   );
 
@@ -256,7 +254,51 @@ export const verifyPharmacy = asyncHandler(async (req, res) => {
     return sendError(res, 404, 'Pharmacy not found');
   }
 
-  sendSuccess(res, 200, { pharmacy }, 'Pharmacy verified successfully');
+  // Notify owner
+  const owner = await User.findById(pharmacy.owner);
+  if (owner) {
+    await Notification.create({
+      user: owner._id,
+      title: 'Pharmacy approved',
+      message: `Your pharmacy "${pharmacy.name}" has been approved and is now visible to customers.`,
+      type: 'general',
+      link: `/pharmacy/profile`,
+      meta: { pharmacyId: pharmacy._id }
+    });
+  }
+
+  sendSuccess(res, 200, { pharmacy }, 'Pharmacy approved successfully');
+});
+
+export const rejectPharmacy = asyncHandler(async (req, res) => {
+  const { reason } = req.body;
+
+  const pharmacy = await Pharmacy.findById(req.params.id).populate('owner', 'name email');
+
+  if (!pharmacy) {
+    return sendError(res, 404, 'Pharmacy not found');
+  }
+
+  pharmacy.status = 'rejected';
+  pharmacy.isVerified = false;
+  pharmacy.isActive = false;
+  pharmacy.rejectionReason = reason || 'Rejected by admin';
+
+  await pharmacy.save();
+
+  // Notify owner
+  if (pharmacy.owner) {
+    await Notification.create({
+      user: pharmacy.owner._id,
+      title: 'Pharmacy application rejected',
+      message: `Your pharmacy "${pharmacy.name}" was rejected. Reason: ${pharmacy.rejectionReason}`,
+      type: 'general',
+      link: `/pharmacy/profile`,
+      meta: { pharmacyId: pharmacy._id }
+    });
+  }
+
+  sendSuccess(res, 200, { pharmacy }, 'Pharmacy rejected successfully');
 });
 
 // Disable pharmacy (admin only)

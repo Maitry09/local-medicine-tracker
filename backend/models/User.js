@@ -28,7 +28,9 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    trim: true
+    trim: true,
+    match: [/^[0-9]{10}$/, 'Phone number must be exactly 10 digits'],
+    default: null
   },
   role: {
     type: String,
@@ -45,10 +47,6 @@ const userSchema = new mongoose.Schema({
       lng: Number
     }
   },
-  pharmacyId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Pharmacy'
-  },
   refreshToken: {
     type: String,
     select: false
@@ -60,9 +58,17 @@ const userSchema = new mongoose.Schema({
   isVerified: {
     type: Boolean,
     default: false
-  }
   },
-  {
+  resetPasswordToken: {
+    type: String,
+    select: false
+  },
+  resetPasswordExpires: {
+    type: Date,
+    select: false
+  }
+},
+{
   timestamps: true
 });
 

@@ -1,16 +1,21 @@
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
 
 const Register = () => {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const roleParam = params.get('role');
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     password: '',
     confirmPassword: '',
-    role: 'patient',
+    role: roleParam || 'patient',
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -21,7 +26,8 @@ const Register = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    const sanitizedValue = name === 'phone' ? value.replace(/\D/g, '') : value;
+    setFormData({ ...formData, [name]: sanitizedValue });
     // Clear error for this field when user starts typing
     if (errors[name]) {
       setErrors({ ...errors, [name]: '' });
@@ -163,6 +169,8 @@ const Register = () => {
             type="tel"
             id="phone"
             name="phone"
+            pattern="[0-9]{10}"
+            maxLength="10"
             value={formData.phone}
             onChange={handleChange}
             placeholder="Enter 10-digit phone number (optional)"
@@ -173,17 +181,21 @@ const Register = () => {
 
         <div className="form-group">
           <label htmlFor="role" className="form-label">Account Type</label>
-          <select
-            id="role"
-            name="role"
-            value={formData.role}
-            onChange={handleChange}
-            className={`form-select ${errors.role ? 'input-error' : ''}`}
-            required
-          >
-            <option value="patient">Patient</option>
-            <option value="pharmacy">Pharmacy Owner</option>
-          </select>
+          {roleParam === 'pharmacy' ? (
+            <input type="text" readOnly value="Pharmacy Owner" className="form-input" />
+          ) : (
+            <select
+              id="role"
+              name="role"
+              value={formData.role}
+              onChange={handleChange}
+              className={`form-select ${errors.role ? 'input-error' : ''}`}
+              required
+            >
+              <option value="patient">Patient</option>
+              <option value="pharmacy">Pharmacy Owner</option>
+            </select>
+          )}
           {errors.role && <small className="error-text">{errors.role}</small>}
         </div>
 

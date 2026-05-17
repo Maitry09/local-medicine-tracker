@@ -1,14 +1,14 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002/api';
 
 // Create axios instance
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api'
+  baseURL: API_BASE_URL
 });
 
 api.interceptors.request.use((req) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
 
   if (token) {
     req.headers.Authorization = `Bearer ${token}`;
@@ -47,13 +47,16 @@ api.interceptors.response.use(
         });
 
         const { accessToken } = response.data.data;
+        // keep both keys for compatibility
         localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('token', accessToken);
 
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
         // Clear tokens and redirect to login
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         window.location.href = '/login';
@@ -74,6 +77,10 @@ export const authAPI = {
   updateProfile: (data) => api.put('/auth/profile', data),
   changePassword: (data) => api.put('/auth/change-password', data)
 };
+
+// extend auth API with forgot/reset
+authAPI.forgotPassword = (email) => api.post('/auth/forgot-password', { email });
+authAPI.resetPassword = (token, password) => api.post('/auth/reset-password', { token, password });
 
 // Medicine API
 export const medicineAPI = {
@@ -135,6 +142,19 @@ export const notificationAPI = {
   sendSmsReminder: (data) => api.post('/notifications/sms', data)
 };
 
+// Saved medicines
+export const savedMedicineAPI = {
+  add: (data) => api.post('/saved-medicines', data),
+  list: (params) => api.get('/saved-medicines', { params }),
+  remove: (id) => api.delete(`/saved-medicines/${id}`)
+};
+
+// Reviews
+export const reviewAPI = {
+  create: (data) => api.post('/reviews', data),
+  getByPharmacy: (pharmacyId, params) => api.get(`/reviews/pharmacy/${pharmacyId}`, { params })
+};
+
 // Order API
 export const orderAPI = {
   getMyOrders: (params) => api.get('/orders/my-orders', { params }),
@@ -167,6 +187,8 @@ export const adminAPI = {
   getAllPayments: (params) => api.get('/admin/payments', { params }),
   getActivityLogs: (params) => api.get('/admin/activity', { params }),
   seedMedicines: () => api.post('/admin/seed-medicines')
+  ,
+  createAdmin: (data) => api.post('/admin/admins', data)
 };
 
 // User API (Admin)

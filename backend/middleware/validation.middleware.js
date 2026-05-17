@@ -49,6 +49,22 @@ export const loginValidation = [
     .notEmpty().withMessage('Password is required')
 ];
 
+export const forgotPasswordValidation = [
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Please enter a valid email')
+];
+
+export const resetPasswordValidation = [
+  body('token')
+    .trim()
+    .notEmpty().withMessage('Reset token is required'),
+  body('password')
+    .notEmpty().withMessage('New password is required')
+    .isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+];
+
 // Medicine validation rules
 export const medicineValidation = [
   body('name')

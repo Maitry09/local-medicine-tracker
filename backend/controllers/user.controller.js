@@ -70,17 +70,17 @@ export const updateUser = asyncHandler(async (req, res) => {
 
 // Disable user (admin only)
 export const disableUser = asyncHandler(async (req, res) => {
-  const user = await User.findByIdAndUpdate(
-    req.params.id,
-    { isActive: false },
-    { new: true }
-  );
+  const userToDisable = await User.findById(req.params.id);
+  if (!userToDisable) return sendError(res, 404, 'User not found');
 
-  if (!user) {
-    return sendError(res, 404, 'User not found');
+  if (userToDisable.role === 'admin') {
+    return sendError(res, 400, 'Cannot deactivate admin users');
   }
 
-  sendSuccess(res, 200, { user }, 'User disabled successfully');
+  userToDisable.isActive = false;
+  await userToDisable.save();
+
+  sendSuccess(res, 200, { user: userToDisable }, 'User disabled successfully');
 });
 
 // Enable user (admin only)
@@ -106,9 +106,8 @@ export const deleteUser = asyncHandler(async (req, res) => {
     return sendError(res, 404, 'User not found');
   }
 
-  // Prevent deleting admin users
-  if (user.role === 'admin') {
-    return sendError(res, 400, 'Cannot delete admin users');
+  if (user._id.toString() === req.userId.toString()) {
+    return sendError(res, 400, 'You cannot delete your own account');
   }
 
   await User.findByIdAndDelete(req.params.id);

@@ -1,5 +1,6 @@
 import User from '../models/User.js';
 import Pharmacy from '../models/Pharmacy.js';
+import Notification from '../models/Notification.js';
 import Medicine from '../models/Medicine.js';
 import Order from '../models/Order.js';
 import Payment from '../models/Payment.js';
@@ -22,7 +23,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     User.countDocuments(),
     User.countDocuments({ role: 'patient' }),
     Pharmacy.countDocuments(),
-    Pharmacy.countDocuments({ isVerified: true }),
+    Pharmacy.countDocuments({ status: 'approved' }),
     Medicine.countDocuments({ isActive: true }),
     Order.countDocuments(),
     Order.countDocuments({ status: 'pending' }),
@@ -104,16 +105,27 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
 
 // Get all pharmacies (admin view with more details)
 export const getAllPharmaciesAdmin = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, isVerified, isActive, search } = req.query;
+  const { page = 1, limit = 10, isVerified, isActive, search, status } = req.query;
 
   const query = {};
 
-  if (isVerified !== undefined) {
-    query.isVerified = isVerified === 'true';
-  }
-
   if (isActive !== undefined) {
     query.isActive = isActive === 'true';
+  }
+
+  // Filter by status field (new schema standard)
+  if (status) {
+    if (status === 'approved') {
+      query.status = 'approved';
+    } else if (status === 'pending') {
+      query.status = 'pending';
+    } else if (status === 'rejected') {
+      query.status = 'rejected';
+    } else if (status === 'disabled') {
+      query.status = 'disabled';
+    } else {
+      query.status = status;
+    }
   }
 
   if (search) {
@@ -136,9 +148,52 @@ export const getAllPharmaciesAdmin = asyncHandler(async (req, res) => {
   const pharmaciesWithStock = await Promise.all(
     pharmacies.map(async (pharmacy) => {
       const stockCount = await Stock.countDocuments({ pharmacy: pharmacy._id });
+      const p = pharmacy.toObject();
+
+      // Normalize status for legacy documents that still use isVerified
+      if (!p.status) {
+        p.status = 'pending';
+      }
+
+      // Compute isOpen dynamically:
+      const now = new Date();
+      let isOpen = true;
+
+      // If permanently closed
+      if (p.permanentClose) {
+        isOpen = false;
+      }
+
+      // If temporarily closed until a future date
+      if (p.tempCloseUntil && new Date(p.tempCloseUntil) > now) {
+        isOpen = false;
+      }
+
+      // If still undecided, check operating hours (skip if already closed)
+      if (isOpen) {
+        const oh = p.operatingHours || {};
+        if (oh.is24Hours) {
+          isOpen = true;
+        } else if (oh.open && oh.close) {
+          const [openH, openM] = (oh.open || '00:00').split(':').map(Number);
+          const [closeH, closeM] = (oh.close || '23:59').split(':').map(Number);
+          const minutesNow = now.getHours() * 60 + now.getMinutes();
+          const openMinutes = openH * 60 + openM;
+          const closeMinutes = closeH * 60 + closeM;
+
+          if (closeMinutes > openMinutes) {
+            isOpen = minutesNow >= openMinutes && minutesNow < closeMinutes;
+          } else {
+            // overnight hours (e.g., open 20:00, close 04:00)
+            isOpen = minutesNow >= openMinutes || minutesNow < closeMinutes;
+          }
+        }
+      }
+
       return {
-        ...pharmacy.toObject(),
-        stockCount
+        ...p,
+        stockCount,
+        isOpen
       };
     })
   );
@@ -155,16 +210,53 @@ export const getAllPharmaciesAdmin = asyncHandler(async (req, res) => {
 
 // Update pharmacy (admin)
 export const updatePharmacyAdmin = asyncHandler(async (req, res) => {
-  const { isVerified, isActive, rating } = req.body;
+  const { status, isActive, rating, rejectionReason, permanentClose, tempCloseUntil } = req.body;
+
+  const update = {};
+  if (typeof status !== 'undefined') update.status = status;
+  if (typeof isActive !== 'undefined') update.isActive = isActive;
+  if (typeof rating !== 'undefined') update.rating = rating;
+  if (typeof permanentClose !== 'undefined') update.permanentClose = permanentClose;
+  if (typeof tempCloseUntil !== 'undefined') update.tempCloseUntil = tempCloseUntil;
+
+  // Handle rejection reason
+  if (status === 'rejected' && rejectionReason) {
+    update.rejectionReason = rejectionReason;
+    update.isActive = false;
+  } else if (status === 'approved') {
+    // Clear rejection reason on approval
+    update.rejectionReason = undefined;
+  }
 
   const pharmacy = await Pharmacy.findByIdAndUpdate(
     req.params.id,
-    { isVerified, isActive, rating },
+    update,
     { new: true, runValidators: true }
   ).populate('owner', 'name email phone');
 
   if (!pharmacy) {
     return sendError(res, 404, 'Pharmacy not found');
+  }
+
+  // Notify owner if rejection or approval
+  if (status === 'rejected' && rejectionReason && pharmacy.owner) {
+    await Notification.create({
+      user: pharmacy.owner._id,
+      title: 'Pharmacy application rejected',
+      message: `Your pharmacy "${pharmacy.name}" was rejected. Reason: ${rejectionReason}`,
+      type: 'general',
+      link: `/pharmacy/profile`,
+      meta: { pharmacyId: pharmacy._id }
+    });
+  } else if (status === 'approved' && pharmacy.owner) {
+    await Notification.create({
+      user: pharmacy.owner._id,
+      title: 'Pharmacy approved',
+      message: `Your pharmacy "${pharmacy.name}" has been approved and is now visible to customers.`,
+      type: 'general',
+      link: `/pharmacy/profile`,
+      meta: { pharmacyId: pharmacy._id }
+    });
   }
 
   sendSuccess(res, 200, { pharmacy }, 'Pharmacy updated successfully');
@@ -266,18 +358,22 @@ export const seedMedicines = asyncHandler(async (req, res) => {
 
 // Create admin user (one-time setup)
 export const createAdminUser = asyncHandler(async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, phone } = req.body;
 
-  // Check if admin already exists
+  // If this is a public setup call (no authenticated admin), only allow when no admin exists
   const existingAdmin = await User.findOne({ role: 'admin' });
-  if (existingAdmin) {
-    return sendError(res, 400, 'Admin user already exists');
+  if (!req.user || req.user.role !== 'admin') {
+    if (existingAdmin) {
+      return sendError(res, 400, 'Admin user already exists');
+    }
   }
 
+  // If caller is an admin, allow creating additional admin users
   const admin = await User.create({
     name,
     email,
     password,
+    phone: phone || '',
     role: 'admin',
     isVerified: true
   });

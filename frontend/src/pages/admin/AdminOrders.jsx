@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { orderAPI } from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
+import '../../styles/admin.css';
 
 const AdminOrders = () => {
   const [orders, setOrders] = useState([]);
@@ -30,7 +31,13 @@ const AdminOrders = () => {
       setLoading(false);
     }
   };
-
+  const getOrderTotal = (order) => {
+      const totalFromItems = order.items?.reduce(
+        (sum, item) => sum + Number(item.price ?? 0) * Number(item.quantity ?? 0),
+        0
+      );
+      return Number(order.totalAmount ?? order.total ?? totalFromItems ?? 0);
+    };
   const getStatusBadge = (status) => {
     const colors = {
       pending: 'badge-warning',
@@ -45,7 +52,7 @@ const AdminOrders = () => {
 
   const totalRevenue = orders
     .filter((o) => o.paymentStatus === 'paid')
-    .reduce((sum, o) => sum + o.totalAmount, 0);
+    .reduce((sum, o) => sum + getOrderTotal(o), 0);
 
   return (
     <div className="admin-orders-page">
@@ -99,10 +106,10 @@ const AdminOrders = () => {
                 {orders.map((order) => (
                   <tr key={order._id}>
                     <td>#{order._id.slice(-8).toUpperCase()}</td>
-                    <td>{order.customer?.name}</td>
+                    <td>{order.user?.name || order.customer?.name || '-'}</td>
                     <td>{order.pharmacy?.name}</td>
                     <td>{order.items?.length} items</td>
-                    <td>Rs. {order.totalAmount.toFixed(2)}</td>
+                    <td>Rs. {getOrderTotal(order).toFixed(2)}</td>
                     <td>
                       <span className={`badge ${order.paymentStatus === 'paid' ? 'badge-success' : 'badge-warning'}`}>
                         {order.paymentStatus}
@@ -114,7 +121,14 @@ const AdminOrders = () => {
                     <td>{new Date(order.createdAt).toLocaleDateString()}</td>
                     <td>
                       <button
-                        onClick={() => setSelectedOrder(order)}
+                        onClick={async () => {
+                          try {
+                            const res = await orderAPI.getById(order._id);
+                            setSelectedOrder(res.data?.data?.order || order);
+                          } catch (err) {
+                            setSelectedOrder(order);
+                          }
+                        }}
                         className="btn btn-outline btn-sm"
                       >
                         View
@@ -164,9 +178,9 @@ const AdminOrders = () => {
               <div className="order-detail-grid">
                 <section>
                   <h3>Customer Information</h3>
-                  <p><strong>Name:</strong> {selectedOrder.customer?.name}</p>
-                  <p><strong>Email:</strong> {selectedOrder.customer?.email}</p>
-                  <p><strong>Phone:</strong> {selectedOrder.customer?.phone}</p>
+                  <p><strong>Name:</strong> {selectedOrder.user?.name || selectedOrder.customer?.name}</p>
+                  <p><strong>Email:</strong> {selectedOrder.user?.email || selectedOrder.customer?.email}</p>
+                  <p><strong>Phone:</strong> {selectedOrder.user?.phone || selectedOrder.customer?.phone}</p>
                 </section>
 
                 <section>
@@ -192,7 +206,7 @@ const AdminOrders = () => {
                       {selectedOrder.paymentStatus}
                     </span>
                   </p>
-                  <p><strong>Total:</strong> Rs. {selectedOrder.totalAmount.toFixed(2)}</p>
+                  <p><strong>Total:</strong> Rs. {getOrderTotal(selectedOrder).toFixed(2)}</p>
                 </section>
               </div>
 

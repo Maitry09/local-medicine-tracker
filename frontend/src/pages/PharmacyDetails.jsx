@@ -125,7 +125,7 @@ const PharmacyDetails = () => {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                 <h1 style={{ marginBottom: 0 }}>{pharmacy.name}</h1>
-                {pharmacy.isVerified && (
+                {pharmacy.status === 'approved' && (
                   <span className="badge badge-success">Verified</span>
                 )}
               </div>

@@ -7,6 +7,7 @@ import {
   updateMyPharmacy,
   getMyPharmacy,
   verifyPharmacy,
+  rejectPharmacy,
   disablePharmacy,
   deletePharmacy
 } from '../controllers/pharmacy.controller.js';
@@ -30,6 +31,7 @@ router.put('/my/update', authMiddleware, requireRole('pharmacy'), updateMyPharma
 // Admin routes
 router.patch('/:id/verify', authMiddleware, requireRole('admin'), mongoIdValidation('id'), validate, verifyPharmacy);
 router.patch('/:id/disable', authMiddleware, requireRole('admin'), mongoIdValidation('id'), validate, disablePharmacy);
+router.patch('/:id/reject', authMiddleware, requireRole('admin'), mongoIdValidation('id'), validate, rejectPharmacy);
 router.delete('/:id', authMiddleware, requireRole('admin'), mongoIdValidation('id'), validate, deletePharmacy);
 
 export default router;

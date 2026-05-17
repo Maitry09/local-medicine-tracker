@@ -51,7 +51,8 @@ const PharmacyOrders = () => {
       pending: 'badge-warning',
       confirmed: 'badge-info',
       processing: 'badge-info',
-      shipped: 'badge-primary',
+      ready: 'badge-primary',
+      out_for_delivery: 'badge-primary',
       delivered: 'badge-success',
       cancelled: 'badge-danger',
     };
@@ -62,8 +63,9 @@ const PharmacyOrders = () => {
     const flow = {
       pending: 'confirmed',
       confirmed: 'processing',
-      processing: 'shipped',
-      shipped: 'delivered',
+      processing: 'ready',
+      ready: 'out_for_delivery',
+      out_for_delivery: 'delivered'
     };
     return flow[currentStatus];
   };

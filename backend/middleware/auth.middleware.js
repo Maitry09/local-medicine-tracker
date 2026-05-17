@@ -34,7 +34,7 @@ export const authMiddleware = async (req, res, next) => {
 
     if (!user.isActive) {
       logger.debug('User account is deactivated');
-      return sendError(res, 401, 'Account has been deactivated');
+      return sendError(res, 401, 'Your account has been deactivated by an administrator');
     }
 
     // Attach user to request

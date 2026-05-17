@@ -141,7 +141,7 @@ const Home = () => {
             Join MediFind to reach more customers and manage your inventory efficiently
           </p>
           <button 
-            onClick={() => navigate('/register')} 
+            onClick={() => navigate('/register?role=pharmacy')} 
             className="btn btn-lg"
             style={{ background: 'white', color: 'var(--secondary)' }}
           >

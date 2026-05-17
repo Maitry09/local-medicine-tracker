@@ -16,6 +16,8 @@ import PharmacyDetails from './pages/PharmacyDetails';
 // Auth Pages
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
 
 // Patient Pages
 import PatientDashboard from './pages/patient/Dashboard';
@@ -113,6 +115,24 @@ function App() {
           element={
             <AuthRedirect>
               <Register />
+            </AuthRedirect>
+          }
+        />
+
+        <Route
+          path="/forgot-password"
+          element={
+            <AuthRedirect>
+              <ForgotPassword />
+            </AuthRedirect>
+          }
+        />
+
+        <Route
+          path="/reset-password"
+          element={
+            <AuthRedirect>
+              <ResetPassword />
             </AuthRedirect>
           }
         />

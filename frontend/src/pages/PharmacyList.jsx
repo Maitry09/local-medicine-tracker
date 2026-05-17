@@ -42,7 +42,6 @@ const PharmacyList = () => {
     try {
       const params = {
         ...filters,
-        isVerified: true,
         limit: 12,
         ...(userLocation && { lat: userLocation.lat, lng: userLocation.lng, radius: 50 })
       };
@@ -104,11 +103,18 @@ const PharmacyList = () => {
       ) : (
         <div className="grid grid-3">
           {pharmacies.map((pharmacy) => (
-            <Link key={pharmacy._id} to={`/pharmacies/${pharmacy._id}`}>
-              <div className="card">
+            <Link key={pharmacy._id} to={`/pharmacies/${pharmacy._id}`} style={{ textDecoration: 'none' }}>
+              <div className="card pharmacy-card">
                 <div className="card-body">
-                  <h3>{pharmacy.name}</h3>
-                  <p>{pharmacy.address.city}</p>
+                  <div className="pharmacy-card-header">
+                    <h3 className="pharmacy-name">{pharmacy.name}</h3>
+                    {pharmacy.status === 'approved' && <span className="badge badge-success">Verified</span>}
+                  </div>
+                  <p className="pharmacy-city">{pharmacy.address?.city}, {pharmacy.address?.state}</p>
+                  <div className="pharmacy-meta">
+                    <span className="pharmacy-owner">Owner: {pharmacy.owner?.name || '—'}</span>
+                    {pharmacy.distance !== undefined && <span className="pharmacy-distance">{pharmacy.distance} km</span>}
+                  </div>
                 </div>
               </div>
             </Link>

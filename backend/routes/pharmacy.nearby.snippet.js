@@ -10,7 +10,7 @@ router.get('/nearby', asyncHandler(async (req, res) => {
   const radiusInMeters = parseFloat(radius) * 1000;
 
   const query = {
-    isVerified: true,
+    status: 'approved',
     isActive: true,
     'address.location': {
       $nearSphere: {

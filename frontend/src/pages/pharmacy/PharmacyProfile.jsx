@@ -19,6 +19,10 @@ const PharmacyProfile = () => {
       city: '',
       state: '',
       pincode: '',
+      coordinates: {
+        lat: '',
+        lng: ''
+      }
     },
     operatingHours: {
       open: '09:00',
@@ -36,7 +40,7 @@ const PharmacyProfile = () => {
   const fetchPharmacy = async () => {
     try {
       const response = await pharmacyAPI.getMyPharmacy();
-      const data = response.data.pharmacy;
+      const data = response.data?.data?.pharmacy || response.data?.pharmacy;
       setPharmacy(data);
       if (data) {
         setFormData({
@@ -50,6 +54,7 @@ const PharmacyProfile = () => {
             city: '',
             state: '',
             pincode: '',
+            coordinates: { lat: '', lng: '' }
           },
           operatingHours: data.operatingHours || {
             open: '09:00',
@@ -73,11 +78,24 @@ const PharmacyProfile = () => {
     setSaving(true);
 
     try {
+      // Ensure coordinates are numbers
+      const coords = formData.address?.coordinates || { lat: '', lng: '' };
+      const payload = {
+        ...formData,
+        address: {
+          ...formData.address,
+          coordinates: {
+            lat: coords.lat === '' ? undefined : Number(coords.lat),
+            lng: coords.lng === '' ? undefined : Number(coords.lng)
+          }
+        }
+      };
+
       if (pharmacy) {
-        await pharmacyAPI.updatePharmacy(pharmacy._id, formData);
+        await pharmacyAPI.updateMyPharmacy(payload);
         showNotification('Pharmacy profile updated successfully', 'success');
       } else {
-        await pharmacyAPI.createPharmacy(formData);
+        await pharmacyAPI.register(payload);
         showNotification('Pharmacy created successfully', 'success');
       }
       fetchPharmacy();
@@ -106,6 +124,16 @@ const PharmacyProfile = () => {
             ? 'Update your pharmacy information and settings'
             : 'Set up your pharmacy to start receiving orders'}
         </p>
+        {pharmacy?.status === 'rejected' && (
+          <div className="alert alert-danger" style={{ marginTop: '0.5rem' }}>
+            <strong>Application Rejected:</strong> {pharmacy.rejectionReason || 'No reason provided'}
+          </div>
+        )}
+        {pharmacy?.status === 'approved' && (
+          <div className="alert alert-success" style={{ marginTop: '0.5rem' }}>
+            Your pharmacy is approved and visible to customers.
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="pharmacy-form">
@@ -215,6 +243,42 @@ const PharmacyProfile = () => {
                   setFormData({
                     ...formData,
                     address: { ...formData.address, pincode: e.target.value },
+                  })
+                }
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Latitude *</label>
+              <input
+                type="number"
+                step="any"
+                value={formData.address.coordinates?.lat || ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    address: {
+                      ...formData.address,
+                      coordinates: { ...formData.address.coordinates, lat: e.target.value }
+                    }
+                  })
+                }
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Longitude *</label>
+              <input
+                type="number"
+                step="any"
+                value={formData.address.coordinates?.lng || ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    address: {
+                      ...formData.address,
+                      coordinates: { ...formData.address.coordinates, lng: e.target.value }
+                    }
                   })
                 }
                 required

@@ -1,6 +1,8 @@
 import User from '../models/User.js';
 import { generateTokenPair, verifyRefreshToken, generateAccessToken } from '../utils/jwt.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
+import { sendPasswordResetEmail } from '../services/emailService.js';
+import crypto from 'crypto';
 
 // Register a new user
 export const register = asyncHandler(async (req, res) => {
@@ -24,7 +26,7 @@ export const register = asyncHandler(async (req, res) => {
       name,
       email,
       password,
-      phone: phone || '',
+      phone: phone || null,
       role: role || 'patient',
       address
     });
@@ -50,7 +52,7 @@ export const register = asyncHandler(async (req, res) => {
 
     // Save refresh token to user
     user.refreshToken = refreshToken;
-    await user.save();
+    await user.save({ validateBeforeSave: false });
     console.log('✅ Refresh token saved to user');
 
     sendSuccess(res, 201, {
@@ -87,7 +89,7 @@ export const login = asyncHandler(async (req, res) => {
   }
 
   if (!user.isActive) {
-    return sendError(res, 401, 'Account has been deactivated');
+    return sendError(res, 401, 'Your account has been deactivated by an administrator');
   }
 
   // Check password
@@ -99,9 +101,9 @@ export const login = asyncHandler(async (req, res) => {
   // Generate tokens
   const { accessToken, refreshToken } = generateTokenPair(user._id, user.role);
 
-  // Save refresh token
+  // Save refresh token (skip validation in case phone/other legacy fields don't pass validators)
   user.refreshToken = refreshToken;
-  await user.save();
+  await user.save({ validateBeforeSave: false });
 
   sendSuccess(res, 200, {
     user: {
@@ -139,13 +141,54 @@ export const refreshToken = asyncHandler(async (req, res) => {
   }
 
   if (!user.isActive) {
-    return sendError(res, 401, 'Account has been deactivated');
+    return sendError(res, 401, 'Your account has been deactivated by an administrator');
   }
 
   // Generate new access token
   const accessToken = generateAccessToken(user._id, user.role);
 
   sendSuccess(res, 200, { accessToken }, 'Token refreshed successfully');
+});
+
+// Forgot password - generate reset token
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    return sendError(res, 404, 'User not found');
+  }
+
+  const token = crypto.randomBytes(20).toString('hex');
+  user.resetPasswordToken = token;
+  user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+  await user.save({ validateBeforeSave: false });
+
+  await sendPasswordResetEmail(user, token);
+  console.log(`Password reset token for ${email}: ${token}`);
+
+  sendSuccess(res, 200, null, 'Password reset instructions sent to your email');
+});
+
+// Reset password using token
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { token, password } = req.body;
+
+  const user = await User.findOne({
+    resetPasswordToken: token,
+    resetPasswordExpires: { $gt: Date.now() }
+  }).select('+password');
+
+  if (!user) {
+    return sendError(res, 400, 'Invalid or expired reset token');
+  }
+
+  user.password = password;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpires = undefined;
+  await user.save({ validateBeforeSave: false });
+
+  sendSuccess(res, 200, null, 'Password has been reset successfully');
 });
 
 // Logout user

@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { adminAPI } from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
+import '../../styles/admin.css';
 
 const AdminPharmacies = () => {
   const [pharmacies, setPharmacies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [selectedPharmacy, setSelectedPharmacy] = useState(null);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
   const { showNotification } = useNotification();
 
   useEffect(() => {
@@ -17,8 +20,8 @@ const AdminPharmacies = () => {
     setLoading(true);
     try {
       const params = {};
-      if (filter === 'pending') params.isVerified = false;
-      if (filter === 'verified') params.isVerified = true;
+      if (filter === 'pending') params.status = 'pending';
+      if (filter === 'verified') params.status = 'approved';
       
       const response = await adminAPI.getAllPharmacies(params);
       setPharmacies(response.data?.data?.pharmacies || []);
@@ -31,34 +34,59 @@ const AdminPharmacies = () => {
 
   const handleVerify = async (pharmacyId) => {
     try {
-      await adminAPI.updatePharmacy(pharmacyId, { isVerified: true });
-      showNotification('Pharmacy verified successfully', 'success');
+      await adminAPI.updatePharmacy(pharmacyId, { status: 'approved' });
+      showNotification('Pharmacy approved successfully', 'success');
       fetchPharmacies();
     } catch (error) {
-      showNotification('Failed to verify pharmacy', 'error');
+      showNotification('Failed to approve pharmacy', 'error');
     }
   };
 
-  const handleReject = async (pharmacyId) => {
-    const reason = prompt('Enter rejection reason:');
-    if (!reason) return;
-    
+  const openRejectModal = (pharmacy) => {
+    setSelectedPharmacy(pharmacy);
+    setRejectionReason('');
+    setShowRejectModal(true);
+  };
+
+  const handleReject = async () => {
+    if (!selectedPharmacy || !rejectionReason.trim()) return;
     try {
-      await adminAPI.updatePharmacy(pharmacyId, { isVerified: false, isActive: false });
-      showNotification('Pharmacy rejected', 'success');
+      await adminAPI.updatePharmacy(selectedPharmacy._id, { status: 'rejected', isActive: false, rejectionReason });
+      showNotification('Pharmacy rejected successfully', 'success');
+      setShowRejectModal(false);
       fetchPharmacies();
     } catch (error) {
       showNotification('Failed to reject pharmacy', 'error');
     }
   };
 
-  const handleToggleStatus = async (pharmacyId, currentStatus) => {
+  const handleToggleStatus = async (pharmacyId, currentStatus, mode = 'permanent') => {
+    // Toggle permanentClose when mode === 'permanent'
     try {
-      await adminAPI.updatePharmacy(pharmacyId, { isActive: !currentStatus });
+      const payload = {};
+      if (mode === 'permanent') {
+        payload.permanentClose = !currentStatus; // Toggle the current status
+      } else {
+        // fallback toggle isActive
+        payload.isActive = !currentStatus;
+      }
+
+      await adminAPI.updatePharmacy(pharmacyId, payload);
       showNotification('Pharmacy status updated', 'success');
       fetchPharmacies();
     } catch (error) {
       showNotification('Failed to update pharmacy status', 'error');
+    }
+  };
+
+  const handleTempClose = async (pharmacyId, hours = 1) => {
+    try {
+      const until = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+      await adminAPI.updatePharmacy(pharmacyId, { tempCloseUntil: until });
+      showNotification(`Pharmacy temporarily closed for ${hours} hour(s)`, 'success');
+      fetchPharmacies();
+    } catch (error) {
+      showNotification('Failed to temp-close pharmacy', 'error');
     }
   };
 
@@ -80,8 +108,8 @@ const AdminPharmacies = () => {
           onClick={() => setFilter('pending')}
         >
           Pending Verification
-          {pharmacies.filter((p) => !p.isVerified).length > 0 && (
-            <span className="count">{pharmacies.filter((p) => !p.isVerified).length}</span>
+          {pharmacies.filter((p) => p.status === 'pending').length > 0 && (
+            <span className="count">{pharmacies.filter((p) => p.status === 'pending').length}</span>
           )}
         </button>
         <button
@@ -108,8 +136,8 @@ const AdminPharmacies = () => {
                 <div className="pharmacy-header">
                   <h3>{pharmacy.name}</h3>
                   <div className="badges">
-                    <span className={`badge ${pharmacy.isVerified ? 'badge-success' : 'badge-warning'}`}>
-                      {pharmacy.isVerified ? 'Verified' : 'Pending'}
+                  <span className={`badge ${pharmacy.status === 'approved' ? 'badge-success' : pharmacy.status === 'rejected' ? 'badge-danger' : pharmacy.status === 'disabled' ? 'badge-secondary' : 'badge-warning'}`}>
+                    {pharmacy.status === 'approved' ? 'Approved' : pharmacy.status === 'rejected' ? 'Rejected' : pharmacy.status === 'disabled' ? 'Disabled' : 'Pending'}
                     </span>
                     <span className={`badge ${pharmacy.isOpen ? 'badge-success' : 'badge-secondary'}`}>
                       {pharmacy.isOpen ? 'Open' : 'Closed'}
@@ -138,8 +166,8 @@ const AdminPharmacies = () => {
                 <section>
                   <h3>Basic Info</h3>
                   <p><strong>License:</strong> {selectedPharmacy.licenseNumber}</p>
-                  <p><strong>Phone:</strong> {selectedPharmacy.phone}</p>
-                  <p><strong>Email:</strong> {selectedPharmacy.email || 'N/A'}</p>
+                  <p><strong>Phone:</strong> {selectedPharmacy.phone || selectedPharmacy.owner?.phone || '-'}</p>
+                  <p><strong>Email:</strong> {selectedPharmacy.email || selectedPharmacy.owner?.email || 'N/A'}</p>
                 </section>
 
                 <section>
@@ -163,30 +191,87 @@ const AdminPharmacies = () => {
                   </p>
                 </section>
 
+                <section>
+                  <h3>Status</h3>
+                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <span className={`badge ${selectedPharmacy.permanentClose ? 'badge-danger' : 'badge-success'}`}>
+                      {selectedPharmacy.permanentClose ? '🔒 Permanently Closed' : '✅ Open'}
+                    </span>
+                    {selectedPharmacy.tempCloseUntil && new Date(selectedPharmacy.tempCloseUntil) > new Date() && (
+                      <span className={`badge badge-warning`}>
+                        ⏱️ Temp Closed until {new Date(selectedPharmacy.tempCloseUntil).toLocaleTimeString()}
+                      </span>
+                    )}
+                  </div>
+                </section>
+
                 <div className="panel-actions">
-                  {!selectedPharmacy.isVerified ? (
+                  {selectedPharmacy.status === 'pending' ? (
                     <>
                       <button
                         onClick={() => handleVerify(selectedPharmacy._id)}
                         className="btn btn-success"
                       >
-                        Verify Pharmacy
+                        Approve Pharmacy
                       </button>
                       <button
-                        onClick={() => handleReject(selectedPharmacy._id)}
+                        onClick={() => openRejectModal(selectedPharmacy)}
                         className="btn btn-danger"
                       >
                         Reject
                       </button>
                     </>
-                  ) : (
-                    <button
-                      onClick={() => handleToggleStatus(selectedPharmacy._id, selectedPharmacy.isOpen)}
-                      className={`btn ${selectedPharmacy.isOpen ? 'btn-outline' : 'btn-success'}`}
-                    >
-                      {selectedPharmacy.isOpen ? 'Set as Closed' : 'Set as Open'}
-                    </button>
-                  )}
+                  ) : selectedPharmacy.status === 'approved' ? (
+                    <>
+                      {selectedPharmacy.permanentClose ? (
+                        <button
+                          onClick={() => handleToggleStatus(selectedPharmacy._id, false, 'permanent')}
+                          className="btn btn-success"
+                        >
+                          Reopen Pharmacy
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleStatus(selectedPharmacy._id, true, 'permanent')}
+                          className="btn btn-danger"
+                        >
+                          Set Permanent Close
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => handleTempClose(selectedPharmacy._id, 1)}
+                        className="btn btn-outline"
+                        style={{ marginLeft: 8 }}
+                      >
+                        Temporarily Close 1h
+                      </button>
+                    </>
+                  ) : (null)}
+                </div>
+              </div>
+            </div>
+          )}
+          {showRejectModal && (
+            <div className="modal-backdrop" onClick={() => setShowRejectModal(false)}>
+              <div className="modal reject-modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>Reject Pharmacy Application</h3>
+                  <button onClick={() => setShowRejectModal(false)} className="close-btn">&times;</button>
+                </div>
+                <div className="modal-body">
+                  <p>Provide a reason for rejecting <strong>{selectedPharmacy?.name}</strong>:</p>
+                  <textarea 
+                    value={rejectionReason} 
+                    onChange={e => setRejectionReason(e.target.value)} 
+                    placeholder="Enter rejection reason..."
+                    rows={5} 
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '4px', border: '1px solid #ddd', fontFamily: 'inherit' }}
+                  />
+                </div>
+                <div className="modal-footer" style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', justifyContent: 'flex-end' }}>
+                  <button className="btn btn-outline" onClick={() => setShowRejectModal(false)}>Cancel</button>
+                  <button className="btn btn-danger" onClick={handleReject} disabled={!rejectionReason.trim()}>Reject Pharmacy</button>
                 </div>
               </div>
             </div>

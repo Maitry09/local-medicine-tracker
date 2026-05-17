@@ -38,6 +38,10 @@ export default function OrderDetails() {
     return colors[status] || 'status-pending';
   };
 
+  const calculateSubtotal = () => {
+    return (order?.items || []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  };
+
   const handleCancelOrder = async () => {
     if (!window.confirm('Are you sure you want to cancel this order?')) return;
     
@@ -158,7 +162,7 @@ export default function OrderDetails() {
             <div className="order-summary">
               <div className="summary-row">
                 <span>Subtotal</span>
-                <span>₹{order.subtotal?.toFixed(2)}</span>
+                <span>₹{calculateSubtotal().toFixed(2)}</span>
               </div>
               {order.discount > 0 && (
                 <div className="summary-row discount">

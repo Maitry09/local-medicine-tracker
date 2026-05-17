@@ -418,34 +418,53 @@ export default function Cart() {
           {deliveryType === 'delivery' && (
             <div className="address-fields">
               <h3>Delivery Address</h3>
-              <input
-                type="text"
-                placeholder="Street address"
-                value={deliveryAddress.street}
-                onChange={(e) => setDeliveryAddress({ ...deliveryAddress, street: e.target.value })}
-                required
-              />
-              <input
-                type="text"
-                placeholder="City"
-                value={deliveryAddress.city}
-                onChange={(e) => setDeliveryAddress({ ...deliveryAddress, city: e.target.value })}
-                required
-              />
-              <input
-                type="text"
-                placeholder="State"
-                value={deliveryAddress.state}
-                onChange={(e) => setDeliveryAddress({ ...deliveryAddress, state: e.target.value })}
-                required
-              />
-              <input
-                type="text"
-                placeholder="Pincode"
-                value={deliveryAddress.pincode}
-                onChange={(e) => setDeliveryAddress({ ...deliveryAddress, pincode: e.target.value })}
-                required
-              />
+              <div className="form-group">
+                <label>Street Address *</label>
+                <input
+                  type="text"
+                  placeholder="Enter street address"
+                  value={deliveryAddress.street}
+                  onChange={(e) => setDeliveryAddress({ ...deliveryAddress, street: e.target.value })}
+                  required
+                  className="form-control"
+                />
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>City *</label>
+                  <input
+                    type="text"
+                    placeholder="Enter city"
+                    value={deliveryAddress.city}
+                    onChange={(e) => setDeliveryAddress({ ...deliveryAddress, city: e.target.value })}
+                    required
+                    className="form-control"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>State *</label>
+                  <input
+                    type="text"
+                    placeholder="Enter state"
+                    value={deliveryAddress.state}
+                    onChange={(e) => setDeliveryAddress({ ...deliveryAddress, state: e.target.value })}
+                    required
+                    className="form-control"
+                  />
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Pincode *</label>
+                <input
+                  type="text"
+                  placeholder="Enter 6-digit pincode"
+                  value={deliveryAddress.pincode}
+                  onChange={(e) => setDeliveryAddress({ ...deliveryAddress, pincode: e.target.value })}
+                  required
+                  className="form-control"
+                  pattern="\d{6}"
+                />
+              </div>
             </div>
           )}
 

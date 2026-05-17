@@ -129,3 +129,23 @@ export async function sendLowStockAlert(pharmacyOwnerEmail, pharmacyName, items)
     </div>
   `);
 }
+
+export async function sendPasswordResetEmail(user, token) {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const resetLink = `${frontendUrl}/reset-password?token=${token}`;
+
+  await sendMail(user.email, 'Password Reset Instructions', `
+    <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#333">
+      <h2>Password Reset Request</h2>
+      <p>Hi ${user.name || 'there'},</p>
+      <p>We received a request to reset your password. Click the button below to set a new password:</p>
+      <p style="text-align:center;margin:1.5rem 0;">
+        <a href="${resetLink}" style="background:#1976d2;color:white;text-decoration:none;padding:0.75rem 1.25rem;border-radius:6px;display:inline-block">Reset Password</a>
+      </p>
+      <p>If the button does not work, copy and paste this URL into your browser:</p>
+      <p><a href="${resetLink}" style="color:#1976d2">${resetLink}</a></p>
+      <p>This link expires in 1 hour.</p>
+      <p>If you did not request a password reset, you can ignore this email.</p>
+    </div>
+  `);
+}

@@ -63,6 +63,24 @@ const pharmacySchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  // temporary and permanent close controls
+  permanentClose: {
+    type: Boolean,
+    default: false
+  },
+  tempCloseUntil: {
+    type: Date,
+    default: null
+  },
+  // approval status for admin workflow: pending, approved, rejected, disabled
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected', 'disabled'],
+    default: 'pending'
+  },
+  rejectionReason: {
+    type: String
+  },
   rating: {
     type: Number,
     default: 0,
