@@ -89,3 +89,17 @@ export const deleteReview = asyncHandler(async (req, res) => {
 });
 
 export default {};
+
+export const getMyReviews = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 20 } = req.query;
+
+  const reviews = await Review.find({ user: req.userId })
+    .populate('pharmacy', 'name address')
+    .limit(limit * 1)
+    .skip((page - 1) * limit)
+    .sort({ createdAt: -1 });
+
+  const total = await Review.countDocuments({ user: req.userId });
+
+  sendSuccess(res, 200, { reviews, pagination: { current: parseInt(page), pages: Math.ceil(total / limit), total } }, 'Your reviews fetched');
+});

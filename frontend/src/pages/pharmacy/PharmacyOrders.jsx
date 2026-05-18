@@ -2,11 +2,29 @@ import { useState, useEffect } from 'react';
 import { orderAPI } from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
 
+// ─── Reusable Confirm Dialog ───────────────────────────────────────────────
+const ConfirmDialog = ({ message, onConfirm, onCancel }) => (
+  <div className="modal-overlay" onClick={onCancel}>
+    <div
+      className="modal-content"
+      onClick={(e) => e.stopPropagation()}
+      style={{ maxWidth: 400, padding: '2rem', textAlign: 'center' }}
+    >
+      <p style={{ fontSize: '1rem', marginBottom: '1.5rem' }}>{message}</p>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+        <button className="btn btn-outline" onClick={onCancel}>Cancel</button>
+        <button className="btn btn-danger" onClick={onConfirm}>Confirm</button>
+      </div>
+    </div>
+  </div>
+);
+
 const PharmacyOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null); // { message, onConfirm }
   const { showNotification } = useNotification();
 
   useEffect(() => {
@@ -36,6 +54,31 @@ const PharmacyOrders = () => {
     } catch (error) {
       showNotification('Failed to update order status', 'error');
     }
+  };
+
+  const handleCODPaymentUpdate = (order) => {
+    const isCurrentlyPaid = order.paymentStatus === 'paid';
+    const newStatus = isCurrentlyPaid ? 'pending' : 'paid';
+    const action = isCurrentlyPaid ? 'mark as unpaid' : 'mark cash as collected (paid)';
+
+    setConfirmDialog({
+      message: `Are you sure you want to ${action} for Order #${order._id?.slice(-8).toUpperCase()}?`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          const response = await orderAPI.updateCODPaymentStatus(order._id, newStatus);
+          showNotification(`COD payment marked as ${newStatus}`, 'success');
+          setSelectedOrder((prev) => ({
+            ...prev,
+            ...(response.data?.data?.order || { paymentStatus: newStatus }),
+          }));
+          fetchOrders();
+        } catch (error) {
+          showNotification(error.response?.data?.message || 'Failed to update payment status', 'error');
+        }
+      },
+      onCancel: () => setConfirmDialog(null),
+    });
   };
 
   const getOrderTotal = (order) => {
@@ -70,8 +113,8 @@ const PharmacyOrders = () => {
     return flow[currentStatus];
   };
 
-  const filteredOrders = filter === 'all' 
-    ? orders 
+  const filteredOrders = filter === 'all'
+    ? orders
     : orders.filter(order => order.status === filter);
 
   if (loading) {
@@ -85,6 +128,14 @@ const PharmacyOrders = () => {
 
   return (
     <div className="pharmacy-orders-page">
+      {confirmDialog && (
+        <ConfirmDialog
+          message={confirmDialog.message}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={confirmDialog.onCancel}
+        />
+      )}
+
       <div className="page-header">
         <h1>Orders Management</h1>
       </div>
@@ -132,6 +183,16 @@ const PharmacyOrders = () => {
                     <span>{order.items?.length || 0} items</span>
                     <span>Rs. {getOrderTotal(order).toFixed(2)}</span>
                   </div>
+                  {order.paymentMethod === 'cod' && (
+                    <div style={{ marginTop: '0.25rem' }}>
+                      <span
+                        className={`badge ${order.paymentStatus === 'paid' ? 'badge-success' : 'badge-warning'}`}
+                        style={{ fontSize: '0.7rem' }}
+                      >
+                        COD · {order.paymentStatus === 'paid' ? 'Collected' : 'Pending'}
+                      </span>
+                    </div>
+                  )}
                   <div className="order-date">
                     {new Date(order.createdAt).toLocaleDateString('en-IN', {
                       day: 'numeric',
@@ -197,6 +258,19 @@ const PharmacyOrders = () => {
                   </span>
                 </p>
                 <p><strong>Total:</strong> Rs. {getOrderTotal(selectedOrder).toFixed(2)}</p>
+
+                {/* COD Payment Toggle */}
+                {selectedOrder.paymentMethod === 'cod' && (
+                  <button
+                    className={`btn btn-sm ${selectedOrder.paymentStatus === 'paid' ? 'btn-outline' : 'btn-success'}`}
+                    style={{ marginTop: '0.75rem' }}
+                    onClick={() => handleCODPaymentUpdate(selectedOrder)}
+                  >
+                    {selectedOrder.paymentStatus === 'paid'
+                      ? '↩ Mark as Unpaid'
+                      : '✓ Mark Cash Collected'}
+                  </button>
+                )}
               </section>
 
               {selectedOrder.status !== 'delivered' && selectedOrder.status !== 'cancelled' && (

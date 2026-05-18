@@ -153,6 +153,7 @@ export const savedMedicineAPI = {
 export const reviewAPI = {
   create: (data) => api.post('/reviews', data),
   getByPharmacy: (pharmacyId, params) => api.get(`/reviews/pharmacy/${pharmacyId}`, { params }),
+  getMyReviews: (params) => api.get('/reviews/my-reviews', { params }),
   update: (id, data) => api.put(`/reviews/${id}`, data),
   delete: (id) => api.delete(`/reviews/${id}`)
 };
@@ -168,6 +169,7 @@ export const orderAPI = {
   getPharmacyOrders: (params) => api.get('/orders/pharmacy/orders', { params }),
   updateOrderStatus: (id, status) => api.patch(`/orders/${id}/status`, { status }),
   updateStatus: (id, data) => api.patch(`/orders/${id}/status`, data),
+  updateCODPaymentStatus: (id, paymentStatus) => api.patch(`/orders/${id}/payment-status`, { paymentStatus }),
   getAllOrders: (params) => api.get('/orders/admin/all', { params })
 };
 

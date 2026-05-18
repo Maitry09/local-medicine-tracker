@@ -5,6 +5,7 @@ import {
   getOrderById,
   createOrder,
   updateOrderStatus,
+  updateCODPaymentStatus,
   getPharmacyOrders,
   cancelOrder,
   getAllOrders
@@ -60,6 +61,15 @@ router.patch(
   mongoIdValidation('id'),
   validate,
   updateOrderStatus
+);
+
+// COD payment status update (pharmacy marks cash as collected)
+router.patch(
+  '/:id/payment-status',
+  requireRole('pharmacy', 'admin'),
+  mongoIdValidation('id'),
+  validate,
+  updateCODPaymentStatus
 );
 
 // ================= ADMIN =================

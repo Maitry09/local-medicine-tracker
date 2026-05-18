@@ -5,13 +5,40 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useNotification } from '../context/NotificationContext';
 
+// ─── Message Popup ────────────────────────────────────────────────────────────
+const MessagePopup = ({ type, message, onClose }) => {
+  const bg = type === 'confirm' ? '#1e40af' : type === 'error' ? '#dc2626' : '#16a34a';
+  return (
+    <div className="modal-overlay" onClick={type !== 'confirm' ? onClose : undefined}>
+      <div
+        className="modal-content"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 400, padding: '2rem', textAlign: 'center', borderTop: `4px solid ${bg}` }}
+      >
+        <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>
+          {type === 'confirm' ? '⚠️' : type === 'error' ? '❌' : '✅'}
+        </div>
+        <p style={{ fontSize: '1rem', marginBottom: '1.5rem', color: '#374151' }}>{message}</p>
+        {type === 'confirm' ? (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+            <button className="btn btn-outline" onClick={onClose?.onCancel}>Cancel</button>
+            <button className="btn btn-danger" onClick={onClose?.onConfirm}>Delete</button>
+          </div>
+        ) : (
+          <button className="btn btn-primary" onClick={onClose}>OK</button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const PharmacyDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToCart } = useCart();
   const { success } = useNotification();
-  
+
   const [pharmacy, setPharmacy] = useState(null);
   const [stock, setStock] = useState([]);
   const [reviews, setReviews] = useState([]);
@@ -23,10 +50,16 @@ const PharmacyDetails = () => {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [editingReviewId, setEditingReviewId] = useState(null);
 
+  // Popup state: { type: 'info'|'error'|'confirm', message, onClose }
+  const [popup, setPopup] = useState(null);
+
   useEffect(() => {
     fetchPharmacyDetails();
     fetchReviews();
   }, [id]);
+
+  const showPopup = (type, message, onClose) => setPopup({ type, message, onClose });
+  const closePopup = () => setPopup(null);
 
   const fetchPharmacyDetails = async () => {
     setLoading(true);
@@ -60,7 +93,12 @@ const PharmacyDetails = () => {
     }
 
     if (!reviewData.comment.trim()) {
-      alert('Please enter a review comment');
+      showPopup('error', 'Please enter a review comment.', closePopup);
+      return;
+    }
+
+    if (reviewData.comment.trim().length < 10) {
+      showPopup('error', 'Review must be at least 10 characters long.', closePopup);
       return;
     }
 
@@ -68,28 +106,30 @@ const PharmacyDetails = () => {
 
     try {
       if (editingReviewId) {
-        // Update existing review
         await reviewAPI.update(editingReviewId, {
           rating: reviewData.rating,
           comment: reviewData.comment
         });
-        success('Review updated successfully');
+        setShowReviewModal(false);
+        setReviewData({ rating: 5, comment: '' });
+        setEditingReviewId(null);
+        fetchReviews();
+        showPopup('info', 'Your review has been updated successfully!', closePopup);
       } else {
-        // Create new review
         await reviewAPI.create({
           pharmacyId: id,
           rating: reviewData.rating,
           comment: reviewData.comment
         });
-        success('Review submitted successfully');
+        setShowReviewModal(false);
+        setReviewData({ rating: 5, comment: '' });
+        setEditingReviewId(null);
+        fetchReviews();
+        showPopup('info', `Thank you! Your review for ${pharmacy?.name} has been submitted.`, closePopup);
       }
-      setShowReviewModal(false);
-      setReviewData({ rating: 5, comment: '' });
-      setEditingReviewId(null);
-      fetchReviews();
     } catch (error) {
       console.error('Failed to submit review:', error);
-      alert(error.response?.data?.message || 'Failed to submit review');
+      showPopup('error', error.response?.data?.message || 'Failed to submit review. Please try again.', closePopup);
     } finally {
       setSubmittingReview(false);
     }
@@ -101,19 +141,21 @@ const PharmacyDetails = () => {
     setShowReviewModal(true);
   };
 
-  const handleDeleteReview = async (reviewId) => {
-    if (!window.confirm('Are you sure you want to delete this review?')) {
-      return;
-    }
-
-    try {
-      await reviewAPI.delete(reviewId);
-      success('Review deleted successfully');
-      fetchReviews();
-    } catch (error) {
-      console.error('Failed to delete review:', error);
-      alert(error.response?.data?.message || 'Failed to delete review');
-    }
+  const handleDeleteReview = (reviewId) => {
+    showPopup('confirm', 'Are you sure you want to delete this review? This action cannot be undone.', {
+      onConfirm: async () => {
+        closePopup();
+        try {
+          await reviewAPI.delete(reviewId);
+          success('Review deleted successfully');
+          fetchReviews();
+        } catch (error) {
+          console.error('Failed to delete review:', error);
+          showPopup('error', error.response?.data?.message || 'Failed to delete review.', closePopup);
+        }
+      },
+      onCancel: closePopup,
+    });
   };
 
   const handleAddToCart = (stockItem) => {
@@ -149,7 +191,7 @@ const PharmacyDetails = () => {
   };
 
   const filteredStock = stock.filter(item => {
-    const matchesSearch = !searchQuery || 
+    const matchesSearch = !searchQuery ||
       item.medicine.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.medicine.genericName && item.medicine.genericName.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesCategory = !selectedCategory || item.medicine.category === selectedCategory;
@@ -161,17 +203,11 @@ const PharmacyDetails = () => {
   const isOpen = () => {
     if (!pharmacy) return false;
     if (pharmacy.operatingHours.is24Hours) return true;
-    
     const now = new Date();
     const currentTime = now.getHours() * 60 + now.getMinutes();
-    
     const [openHour, openMin] = pharmacy.operatingHours.open.split(':').map(Number);
     const [closeHour, closeMin] = pharmacy.operatingHours.close.split(':').map(Number);
-    
-    const openTime = openHour * 60 + openMin;
-    const closeTime = closeHour * 60 + closeMin;
-    
-    return currentTime >= openTime && currentTime <= closeTime;
+    return currentTime >= openHour * 60 + openMin && currentTime <= closeHour * 60 + closeMin;
   };
 
   if (loading) {
@@ -196,6 +232,11 @@ const PharmacyDetails = () => {
 
   return (
     <div className="container" style={{ padding: '2rem 1rem' }}>
+      {/* Message Popup */}
+      {popup && (
+        <MessagePopup type={popup.type} message={popup.message} onClose={popup.onClose} />
+      )}
+
       {/* Pharmacy Info */}
       <div className="card mb-4">
         <div className="card-body" style={{ padding: '2rem' }}>
@@ -207,11 +248,9 @@ const PharmacyDetails = () => {
                   <span className="badge badge-success">Verified</span>
                 )}
               </div>
-              
               <p className="text-muted" style={{ marginBottom: '0.5rem' }}>
                 {pharmacy.address.street}, {pharmacy.address.city}, {pharmacy.address.state} - {pharmacy.address.pincode}
               </p>
-              
               <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
                 <div>
                   <p className="text-sm text-muted">Phone</p>
@@ -224,16 +263,15 @@ const PharmacyDetails = () => {
                 <div>
                   <p className="text-sm text-muted">Hours</p>
                   <p className="font-bold">
-                    {pharmacy.operatingHours.is24Hours 
-                      ? '24 Hours' 
+                    {pharmacy.operatingHours.is24Hours
+                      ? '24 Hours'
                       : `${pharmacy.operatingHours.open} - ${pharmacy.operatingHours.close}`}
                   </p>
                 </div>
               </div>
             </div>
-            
             <div style={{ textAlign: 'right' }}>
-              <div className={`pharmacy-status`} style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>
+              <div className="pharmacy-status" style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>
                 <span className={`status-dot ${isOpen() ? 'open' : 'closed'}`}></span>
                 {isOpen() ? 'Open Now' : 'Closed'}
               </div>
@@ -260,7 +298,11 @@ const PharmacyDetails = () => {
           </div>
           <button
             className="btn btn-primary btn-sm"
-            onClick={() => setShowReviewModal(true)}
+            onClick={() => {
+              setReviewData({ rating: 5, comment: '' });
+              setEditingReviewId(null);
+              setShowReviewModal(true);
+            }}
           >
             Write a Review
           </button>
@@ -347,7 +389,7 @@ const PharmacyDetails = () => {
 
       {/* Stock List */}
       <h2 className="mb-3">Available Medicines ({filteredStock.length})</h2>
-      
+
       {filteredStock.length > 0 ? (
         <div className="grid grid-3">
           {filteredStock.map((item) => (
@@ -359,7 +401,6 @@ const PharmacyDetails = () => {
                     <span className="badge badge-warning">Low Stock</span>
                   )}
                 </div>
-                
                 <Link to={`/medicines/${item.medicine._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                   <h4 className="medicine-name">{item.medicine.name}</h4>
                 </Link>
@@ -367,7 +408,6 @@ const PharmacyDetails = () => {
                   <p className="medicine-generic">{item.medicine.genericName}</p>
                 )}
                 <p className="text-sm text-muted mb-2">{item.medicine.manufacturer}</p>
-                
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
                   <div>
                     <span className="medicine-price">
@@ -377,14 +417,13 @@ const PharmacyDetails = () => {
                       <span className="medicine-mrp">Rs. {item.price}</span>
                     )}
                   </div>
-                  <button 
+                  <button
                     className="btn btn-primary btn-sm"
                     onClick={() => handleAddToCart(item)}
                   >
                     Add
                   </button>
                 </div>
-                
                 <p className="text-xs text-muted mt-2">
                   {item.quantity} units available
                 </p>
@@ -402,11 +441,12 @@ const PharmacyDetails = () => {
         </div>
       )}
 
+      {/* Review Modal */}
       {showReviewModal && (
         <div className="modal-overlay" onClick={() => setShowReviewModal(false)}>
           <div className="modal-content review-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Review {pharmacy?.name}</h2>
+              <h2>{editingReviewId ? 'Edit Review' : 'Review'} — {pharmacy?.name}</h2>
               <button className="close-btn" onClick={() => setShowReviewModal(false)}>×</button>
             </div>
             <div className="modal-body">
@@ -435,15 +475,19 @@ const PharmacyDetails = () => {
                   onChange={(e) => setReviewData({ ...reviewData, comment: e.target.value })}
                   rows={4}
                 />
-                <p className="char-count">{reviewData.comment.length} characters</p>
+                <p className="char-count">{reviewData.comment.length} characters (min 10)</p>
               </div>
             </div>
             <div className="modal-footer">
               <button className="btn btn-outline" onClick={() => setShowReviewModal(false)} disabled={submittingReview}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleSubmitReview} disabled={submittingReview || reviewData.comment.trim().length < 10}>
-                {submittingReview ? 'Submitting...' : 'Submit Review'}
+              <button
+                className="btn btn-primary"
+                onClick={handleSubmitReview}
+                disabled={submittingReview || reviewData.comment.trim().length < 10}
+              >
+                {submittingReview ? 'Submitting...' : editingReviewId ? 'Update Review' : 'Submit Review'}
               </button>
             </div>
           </div>
