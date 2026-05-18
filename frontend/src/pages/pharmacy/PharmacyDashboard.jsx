@@ -20,7 +20,7 @@ const PharmacyDashboard = () => {
     try {
       const [ordersRes, stockRes] = await Promise.all([
         orderAPI.getPharmacyOrders({ limit: 5 }),
-        stockAPI.getPharmacyStock()
+        stockAPI.getMyStock()
       ]);
 
       const orders = ordersRes.data?.data?.orders || [];

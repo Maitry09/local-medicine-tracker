@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { pharmacyAPI } from '../services/api';
+import { pharmacyAPI, reviewAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useNotification } from '../context/NotificationContext';
@@ -14,12 +14,17 @@ const PharmacyDetails = () => {
   
   const [pharmacy, setPharmacy] = useState(null);
   const [stock, setStock] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewData, setReviewData] = useState({ rating: 5, comment: '' });
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     fetchPharmacyDetails();
+    fetchReviews();
   }, [id]);
 
   const fetchPharmacyDetails = async () => {
@@ -35,6 +40,46 @@ const PharmacyDetails = () => {
       console.error('Failed to fetch pharmacy:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReviews = async () => {
+    try {
+      const res = await reviewAPI.getByPharmacy(id, { limit: 10 });
+      setReviews(res.data.data.reviews || []);
+    } catch (error) {
+      console.error('Failed to fetch reviews:', error);
+    }
+  };
+
+  const handleSubmitReview = async () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    if (!reviewData.comment.trim()) {
+      alert('Please enter a review comment');
+      return;
+    }
+
+    setSubmittingReview(true);
+
+    try {
+      await reviewAPI.create({
+        pharmacyId: id,
+        rating: reviewData.rating,
+        comment: reviewData.comment
+      });
+      success('Review submitted successfully');
+      setShowReviewModal(false);
+      setReviewData({ rating: 5, comment: '' });
+      fetchReviews();
+    } catch (error) {
+      console.error('Failed to submit review:', error);
+      alert(error.response?.data?.message || 'Failed to submit review');
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -171,6 +216,46 @@ const PharmacyDetails = () => {
         </div>
       </div>
 
+      {/* Review Summary */}
+      <div className="card mb-4">
+        <div className="card-body" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h2 style={{ marginBottom: '0.5rem' }}>Customer Reviews</h2>
+            <p className="text-muted" style={{ margin: 0 }}>
+              {reviews.length} review{reviews.length === 1 ? '' : 's'} available.
+            </p>
+          </div>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => setShowReviewModal(true)}
+          >
+            Write a Review
+          </button>
+        </div>
+      </div>
+
+      {reviews.length > 0 && (
+        <div className="card mb-4">
+          <div className="card-body">
+            {reviews.slice(0, 3).map((review) => (
+              <div key={review._id} style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+                  <strong>{review.user?.name || 'Customer'}</strong>
+                  <span style={{ color: '#ffc107' }}>★ {review.rating.toFixed(1)}</span>
+                </div>
+                <p className="text-muted" style={{ margin: '0.25rem 0' }}>{new Date(review.createdAt).toLocaleDateString('en-IN')}</p>
+                <p>{review.comment}</p>
+              </div>
+            ))}
+            {reviews.length > 3 && (
+              <p className="text-muted" style={{ margin: 0 }}>
+                Showing 3 of {reviews.length} reviews.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Stock Search */}
       <div className="card mb-4">
         <div className="card-body">
@@ -253,6 +338,54 @@ const PharmacyDetails = () => {
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💊</div>
             <h3>No medicines found</h3>
             <p className="text-muted">Try adjusting your search or filters</p>
+          </div>
+        </div>
+      )}
+
+      {showReviewModal && (
+        <div className="modal-overlay" onClick={() => setShowReviewModal(false)}>
+          <div className="modal-content review-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Review {pharmacy?.name}</h2>
+              <button className="close-btn" onClick={() => setShowReviewModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="review-section">
+                <label className="review-label">Rating *</label>
+                <div className="rating-stars">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      className={`star ${reviewData.rating >= star ? 'active' : ''}`}
+                      onClick={() => setReviewData({ ...reviewData, rating: star })}
+                      type="button"
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
+                <p className="rating-value">{reviewData.rating} out of 5 stars</p>
+              </div>
+              <div className="review-section">
+                <label className="review-label">Your Review *</label>
+                <textarea
+                  className="review-textarea"
+                  placeholder="Share your experience with this pharmacy..."
+                  value={reviewData.comment}
+                  onChange={(e) => setReviewData({ ...reviewData, comment: e.target.value })}
+                  rows={4}
+                />
+                <p className="char-count">{reviewData.comment.length} characters</p>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-outline" onClick={() => setShowReviewModal(false)} disabled={submittingReview}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleSubmitReview} disabled={submittingReview || reviewData.comment.trim().length < 10}>
+                {submittingReview ? 'Submitting...' : 'Submit Review'}
+              </button>
+            </div>
           </div>
         </div>
       )}

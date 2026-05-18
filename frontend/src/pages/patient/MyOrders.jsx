@@ -71,6 +71,11 @@ export default function MyOrders() {
     return colors[status] || 'status-pending';
   };
 
+  const getOrderTotal = (order) => {
+    if (order?.total != null) return order.total;
+    return (order?.subtotal || 0) - (order?.discount || 0) + (order?.deliveryCharge || 0) + (order?.tax || 0);
+  };
+
   const handleCancelOrder = async (orderId) => {
     if (
       !window.confirm(

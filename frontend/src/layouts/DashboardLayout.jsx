@@ -23,7 +23,8 @@ const DashboardLayout = () => {
     { path: '/pharmacy/analytics', label: 'Analytics', icon: '📈' },
     { path: '/pharmacy/stock', label: 'Manage Stock', icon: '💊' },
     { path: '/pharmacy/orders', label: 'Orders', icon: '📦' },
-    { path: '/pharmacy/profile', label: 'Pharmacy Profile', icon: '🏪' }
+    { path: '/pharmacy/profile', label: 'Pharmacy Profile', icon: '🏪' },
+    { path: '/pharmacy/settings', label: 'Settings', icon: '⚙️' }
   ];
 
   const adminLinks = [

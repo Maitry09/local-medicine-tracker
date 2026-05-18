@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { reviewAPI } from '../../services/api';
 import '../../styles/orderdetails.css';
 
 export default function OrderDetails() {
@@ -8,6 +9,9 @@ export default function OrderDetails() {
   const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewData, setReviewData] = useState({ rating: 5, comment: '' });
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     fetchOrderDetails();
@@ -42,6 +46,15 @@ export default function OrderDetails() {
     return (order?.items || []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
   };
 
+  const calculateTotal = () => {
+    if (order?.total != null) return order.total;
+    const subtotal = calculateSubtotal();
+    const discount = order?.discount || 0;
+    const deliveryCharge = order?.deliveryCharge || 0;
+    const tax = order?.tax || 0;
+    return subtotal - discount + deliveryCharge + tax;
+  };
+
   const handleCancelOrder = async () => {
     if (!window.confirm('Are you sure you want to cancel this order?')) return;
     
@@ -50,6 +63,36 @@ export default function OrderDetails() {
       fetchOrderDetails();
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to cancel order');
+    }
+  };
+
+  const handleSubmitReview = async () => {
+    if (reviewData.rating < 1 || reviewData.rating > 5) {
+      alert('Please select a rating between 1 and 5');
+      return;
+    }
+    
+    if (!reviewData.comment.trim()) {
+      alert('Please enter a review comment');
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      await reviewAPI.create({
+        pharmacyId: order.pharmacy._id,
+        orderId: order._id,
+        rating: reviewData.rating,
+        comment: reviewData.comment
+      });
+      alert('Review submitted successfully! Thank you for your feedback.');
+      setShowReviewModal(false);
+      setReviewData({ rating: 5, comment: '' });
+      fetchOrderDetails();
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to submit review');
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -84,7 +127,7 @@ export default function OrderDetails() {
     return (
       <div className="empty-state">
         <h3>Order not found</h3>
-        <Link to="/patient/orders" className="btn btn-primary">Back to Orders</Link>
+        <Link to="/orders" className="btn btn-primary">Back to Orders</Link>
       </div>
     );
   }
@@ -92,7 +135,7 @@ export default function OrderDetails() {
   return (
     <div className="order-details-page">
       <div className="page-header">
-        <Link to="/patient/orders" className="back-link">
+        <Link to="/orders" className="back-link">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
@@ -172,11 +215,17 @@ export default function OrderDetails() {
               )}
               <div className="summary-row">
                 <span>Delivery Fee</span>
-                <span>{order.deliveryFee > 0 ? `₹${order.deliveryFee?.toFixed(2)}` : 'Free'}</span>
+                <span>{order.deliveryCharge > 0 ? `₹${order.deliveryCharge?.toFixed(2)}` : 'Free'}</span>
               </div>
+              {order.tax > 0 && (
+                <div className="summary-row">
+                  <span>Tax</span>
+                  <span>₹{order.tax?.toFixed(2)}</span>
+                </div>
+              )}
               <div className="summary-row total">
                 <span>Total</span>
-                <span>₹{order.total?.toFixed(2)}</span>
+                <span>₹{calculateTotal().toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -241,8 +290,74 @@ export default function OrderDetails() {
               Cancel Order
             </button>
           )}
+          
+          {order.status === 'delivered' && (
+            <button className="btn btn-primary btn-full" onClick={() => setShowReviewModal(true)}>
+              ⭐ Write Review
+            </button>
+          )}
         </div>
       </div>
+
+      {showReviewModal && (
+        <div className="modal-overlay" onClick={() => setShowReviewModal(false)}>
+          <div className="modal-content review-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Review {order.pharmacy?.name}</h2>
+              <button className="close-btn" onClick={() => setShowReviewModal(false)}>×</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="review-section">
+                <label className="review-label">Rating *</label>
+                <div className="rating-stars">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      className={`star ${reviewData.rating >= star ? 'active' : ''}`}
+                      onClick={() => setReviewData({ ...reviewData, rating: star })}
+                      type="button"
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
+                <p className="rating-value">{reviewData.rating} out of 5 stars</p>
+              </div>
+
+              <div className="review-section">
+                <label className="review-label">Your Review *</label>
+                <textarea
+                  className="review-textarea"
+                  placeholder="Share your experience with this pharmacy... (minimum 10 characters)"
+                  value={reviewData.comment}
+                  onChange={(e) => setReviewData({ ...reviewData, comment: e.target.value })}
+                  rows={4}
+                />
+                <p className="char-count">{reviewData.comment.length} characters</p>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button 
+                className="btn btn-outline" 
+                onClick={() => setShowReviewModal(false)}
+                disabled={submittingReview}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={handleSubmitReview}
+                disabled={submittingReview || reviewData.comment.trim().length < 10}
+              >
+                {submittingReview ? 'Submitting...' : 'Submit Review'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

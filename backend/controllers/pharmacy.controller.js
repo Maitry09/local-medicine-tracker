@@ -220,11 +220,33 @@ export const updateMyPharmacy = asyncHandler(async (req, res) => {
     return sendError(res, 404, 'Pharmacy not found');
   }
 
-  const { name, phone, address, operatingHours } = req.body;
+  const {
+    name,
+    phone,
+    address,
+    operatingHours,
+    defaultDiscount,
+    defaultDeliveryFee
+  } = req.body;
+
+  const updatePayload = {
+    name,
+    phone,
+    address,
+    operatingHours
+  };
+
+  if (typeof defaultDiscount !== 'undefined') {
+    updatePayload.defaultDiscount = defaultDiscount;
+  }
+
+  if (typeof defaultDeliveryFee !== 'undefined') {
+    updatePayload.defaultDeliveryFee = defaultDeliveryFee;
+  }
 
   const updated = await Pharmacy.findByIdAndUpdate(
     pharmacy._id,
-    { name, phone, address, operatingHours },
+    updatePayload,
     { new: true, runValidators: true }
   );
 

@@ -7,6 +7,7 @@ import {
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import { pharmacyAPI } from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
 
 import '../../styles/cartcss.css';
@@ -26,6 +27,7 @@ export default function Cart() {
   const { user } = useAuth();
   const [deliveryType, setDeliveryType] = useState('pickup');
   const [paymentMethod, setPaymentMethod] = useState('cod');
+  const [pharmacySettings, setPharmacySettings] = useState({});
   const [deliveryAddress, setDeliveryAddress] = useState({
     street: user?.address?.street || '',
     city: user?.address?.city || '',
@@ -43,6 +45,35 @@ export default function Cart() {
       });
     }
   }, [user]);
+
+  // Fetch pharmacy settings for discounts and delivery fees
+  useEffect(() => {
+    const fetchPharmacySettings = async () => {
+      const settings = {};
+      const uniquePharmacies = [...new Set(cartItems.map(item => item.pharmacyId))];
+      
+      for (const pharmacyId of uniquePharmacies) {
+        try {
+          const res = await pharmacyAPI.getById(pharmacyId);
+          const pharmacy = res.data?.data?.pharmacy || res.data?.pharmacy;
+          if (pharmacy) {
+            settings[pharmacyId] = {
+              discount: pharmacy.defaultDiscount || 0,
+              deliveryFee: pharmacy.defaultDeliveryFee || 0
+            };
+          }
+        } catch (err) {
+          console.error(`Failed to fetch pharmacy ${pharmacyId}:`, err);
+          settings[pharmacyId] = { discount: 0, deliveryFee: 0 };
+        }
+      }
+      setPharmacySettings(settings);
+    };
+
+    if (cartItems.length > 0) {
+      fetchPharmacySettings();
+    }
+  }, [cartItems]);
 
   const groupedItems = cartItems.reduce(
     (groups, item) => {
@@ -65,6 +96,22 @@ export default function Cart() {
     },
     {}
   );
+
+  const calculatePharmacyTotal = (pharmacyId, items) => {
+    const subtotal = items.reduce((s, it) => s + ((it.price || 0) * it.quantity), 0);
+    const discount = pharmacySettings[pharmacyId]?.discount || 0;
+    const deliveryFee = deliveryType === 'delivery' ? (pharmacySettings[pharmacyId]?.deliveryFee || 0) : 0;
+    const discountAmount = (subtotal * discount) / 100;
+    return subtotal - discountAmount + deliveryFee;
+  };
+
+  const getCartTotalWithFees = () => {
+    let total = 0;
+    Object.entries(groupedItems).forEach(([pharmacyId, pharmacy]) => {
+      total += calculatePharmacyTotal(pharmacyId, pharmacy.items);
+    });
+    return total;
+  };
 
   const loadRazorpayScript = () => {
     return new Promise((resolve) => {
@@ -122,18 +169,30 @@ export default function Cart() {
       ) || [];
       // Create per-pharmacy orders
       const ordersToPlace = Object.entries(groupedItems).map(
-        ([pharmacyId, pharmacy]) => ({
-          pharmacyId,
-          items: pharmacy.items.map(item => ({
-            medicineId: item.medicineId,
-            quantity: item.quantity,
-            price: item.price || 0
-          })),
-          total: pharmacy.items.reduce((s, it) => s + ((it.price || 0) * it.quantity), 0),
-          deliveryType,
-          paymentMethod,
-          deliveryAddress: deliveryType === 'delivery' ? deliveryAddress : undefined
-        })
+        ([pharmacyId, pharmacy]) => {
+          const subtotal = pharmacy.items.reduce((s, it) => s + ((it.price || 0) * it.quantity), 0);
+          const discountPercent = pharmacySettings[pharmacyId]?.discount || 0;
+          const discountAmount = (subtotal * discountPercent) / 100;
+          const deliveryFee = deliveryType === 'delivery' ? (pharmacySettings[pharmacyId]?.deliveryFee || 0) : 0;
+          const total = subtotal - discountAmount + deliveryFee;
+
+          return {
+            pharmacyId,
+            items: pharmacy.items.map(item => ({
+              medicineId: item.medicineId,
+              quantity: item.quantity,
+              price: item.price || 0
+            })),
+            subtotal,
+            discount: discountAmount,
+            discountPercent,
+            deliveryFee: deliveryType === 'delivery' ? deliveryFee : 0,
+            total,
+            deliveryType,
+            paymentMethod,
+            deliveryAddress: deliveryType === 'delivery' ? deliveryAddress : undefined
+          };
+        }
       );
 
       // Razorpay
@@ -159,7 +218,9 @@ export default function Cart() {
         paymentMethod,
         deliveryAddress: od.deliveryAddress || null,
         paymentStatus,
-        razorpayPaymentId
+        razorpayPaymentId,
+        discount: od.discount || 0,
+        deliveryCharge: od.deliveryFee || 0
       };
 
       await api.post('/orders', payload);
@@ -169,7 +230,7 @@ export default function Cart() {
 
     clearCart();
 
-    navigate('/patient/my-orders');
+    navigate('/orders');
 
   } catch (err) {
 
@@ -197,7 +258,7 @@ export default function Cart() {
 
         const options = {
           key: razorpayKey,
-          amount: Math.round(getCartTotal() * 100),
+          amount: Math.round(getCartTotalWithFees() * 100),
           currency: 'INR',
           name: 'Medicine Tracker',
           description: 'Medicine Order Payment',
@@ -387,10 +448,43 @@ export default function Cart() {
             </span>
           </div>
 
+          <div className="summary-row">
+            <span>Subtotal</span>
+            <span>
+              ₹{Math.round(getCartTotal())}
+            </span>
+          </div>
+
+          {Object.entries(groupedItems).map(([pharmacyId, pharmacy]) => {
+            const settings = pharmacySettings[pharmacyId];
+            if (!settings) return null;
+            
+            const subtotal = pharmacy.items.reduce((s, it) => s + ((it.price || 0) * it.quantity), 0);
+            const discountAmount = (subtotal * (settings.discount || 0)) / 100;
+            const deliveryFee = deliveryType === 'delivery' ? (settings.deliveryFee || 0) : 0;
+
+            return (
+              <div key={pharmacyId}>
+                {discountAmount > 0 && (
+                  <div className="summary-row discount-row">
+                    <span>Discount ({settings.discount}%)</span>
+                    <span>-₹{Math.round(discountAmount)}</span>
+                  </div>
+                )}
+                {deliveryFee > 0 && deliveryType === 'delivery' && (
+                  <div className="summary-row fee-row">
+                    <span>Delivery Fee</span>
+                    <span>+₹{Math.round(deliveryFee)}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
           <div className="summary-row total-row">
             <span>Total</span>
             <span>
-              ₹{Math.round(getCartTotal())}
+              ₹{Math.round(getCartTotalWithFees())}
             </span>
           </div>
           <div className="checkout-options">

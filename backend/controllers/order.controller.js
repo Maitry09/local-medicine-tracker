@@ -96,7 +96,10 @@ export const createOrder = asyncHandler(async (req, res) => {
     prescriptionImage,
     paymentMethod,
     paymentStatus,
-    razorpayPaymentId
+    razorpayPaymentId,
+    discount = 0,
+    deliveryCharge: requestedDeliveryCharge,
+    deliveryFee
   } = req.body;
 
   // verify pharmacy
@@ -120,7 +123,7 @@ export const createOrder = asyncHandler(async (req, res) => {
       medicine: item.medicineId,
       quantity: item.quantity,
       price: itemPrice,
-      discount: 0
+      discount: item.discount || 0
     });
 
     subtotal += itemPrice * item.quantity;
@@ -130,11 +133,11 @@ export const createOrder = asyncHandler(async (req, res) => {
 
   const deliveryCharge =
     deliveryType === 'delivery'
-      ? 50
+      ? Number(requestedDeliveryCharge ?? deliveryFee ?? 0)
       : 0;
 
   const total =
-    subtotal +
+    subtotal - Number(discount || 0) +
     tax +
     deliveryCharge;
 
@@ -146,6 +149,7 @@ export const createOrder = asyncHandler(async (req, res) => {
     pharmacy: pharmacyId,
     items: orderItems,
     subtotal,
+    discount: Number(discount || 0),
     tax,
     deliveryCharge,
     total,

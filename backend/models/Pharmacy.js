@@ -90,6 +90,17 @@ const pharmacySchema = new mongoose.Schema({
   totalRatings: {
     type: Number,
     default: 0
+  },
+  defaultDiscount: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100
+  },
+  defaultDeliveryFee: {
+    type: Number,
+    default: 0,
+    min: 0
   }
 }, {
   timestamps: true

@@ -33,6 +33,7 @@ import PharmacyDashboard from './pages/pharmacy/PharmacyDashboard';
 import ManageStock from './pages/pharmacy/PharmacyStock';
 import PharmacyOrders from './pages/pharmacy/PharmacyOrders';
 import PharmacyProfile from './pages/pharmacy/PharmacyProfile';
+import PharmacySettings from './pages/pharmacy/PharmacySettings';
 import PharmacyAnalytics from './pages/pharmacy/PharmacyAnalytics';
 
 // Admin Pages
@@ -198,6 +199,10 @@ function App() {
           <Route
             path="/pharmacy/profile"
             element={<PharmacyProfile />}
+          />
+          <Route
+            path="/pharmacy/settings"
+            element={<PharmacySettings />}
           />
         </Route>
       </Route>
