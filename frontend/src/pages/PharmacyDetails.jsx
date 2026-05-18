@@ -299,6 +299,10 @@ const PharmacyDetails = () => {
           <button
             className="btn btn-primary btn-sm"
             onClick={() => {
+              if (!user) {
+                navigate('/login');
+                return;
+              }
               setReviewData({ rating: 5, comment: '' });
               setEditingReviewId(null);
               setShowReviewModal(true);

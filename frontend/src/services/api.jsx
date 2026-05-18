@@ -86,7 +86,14 @@ authAPI.resetPassword = (token, password) => api.post('/auth/reset-password', { 
 export const medicineAPI = {
   search: (params) => api.get('/medicines/search', { params }),
   getAll: (params) => api.get('/medicines/search', { params }),
-  getMedicines: (params) => api.get('/medicines/search', { params }),
+  getMedicines: (params) => {
+    const requestParams = { ...params };
+    if (requestParams.search) {
+      requestParams.q = requestParams.search;
+      delete requestParams.search;
+    }
+    return api.get('/medicines/search', { params: requestParams });
+  },
   getById: (id) => api.get(`/medicines/${id}`),
   getAvailability: (id, params) => api.get(`/medicines/${id}/availability`, { params }),
   getCategories: () => api.get('/medicines/categories'),
@@ -153,6 +160,7 @@ export const savedMedicineAPI = {
 export const reviewAPI = {
   create: (data) => api.post('/reviews', data),
   getByPharmacy: (pharmacyId, params) => api.get(`/reviews/pharmacy/${pharmacyId}`, { params }),
+  getAll: (params) => api.get('/reviews', { params }),
   getMyReviews: (params) => api.get('/reviews/my-reviews', { params }),
   update: (id, data) => api.put(`/reviews/${id}`, data),
   delete: (id) => api.delete(`/reviews/${id}`)

@@ -54,14 +54,13 @@ const AdminMedicines = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!editingMedicine) {
+      showNotification('Please select a medicine to edit', 'error');
+      return;
+    }
     try {
-      if (editingMedicine) {
-        await medicineAPI.update(editingMedicine._id, formData);
-        showNotification('Medicine updated successfully', 'success');
-      } else {
-        await medicineAPI.create(formData);
-        showNotification('Medicine created successfully', 'success');
-      }
+      await medicineAPI.update(editingMedicine._id, { ...formData, mrp: Number(formData.mrp) });
+      showNotification('Medicine updated successfully', 'success');
       setShowModal(false);
       resetForm();
       fetchMedicines();
@@ -81,6 +80,7 @@ const AdminMedicines = () => {
       composition: medicine.composition || '',
       dosageForm: medicine.dosageForm || 'tablet',
       strength: medicine.strength || '',
+      mrp: medicine.mrp || '',
       prescriptionRequired: medicine.prescriptionRequired || false,
       sideEffects: medicine.sideEffects?.join(', ') || '',
       contraindications: medicine.contraindications?.join(', ') || '',
@@ -110,6 +110,7 @@ const AdminMedicines = () => {
       composition: '',
       dosageForm: 'tablet',
       strength: '',
+      mrp: '',
       prescriptionRequired: false,
       sideEffects: '',
       contraindications: '',
@@ -120,15 +121,6 @@ const AdminMedicines = () => {
     <div className="admin-medicines-page">
       <div className="page-header">
         <h1>Medicines Management</h1>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowModal(true);
-          }}
-          className="btn btn-primary"
-        >
-          Add Medicine
-        </button>
       </div>
 
       <div className="filters-bar">
@@ -227,7 +219,7 @@ const AdminMedicines = () => {
         <div className="modal-overlay">
           <div className="modal modal-large">
             <div className="modal-header">
-              <h2>{editingMedicine ? 'Edit Medicine' : 'Add New Medicine'}</h2>
+              <h2>Edit Medicine</h2>
               <button onClick={() => setShowModal(false)} className="close-btn">
                 &times;
               </button>
@@ -298,6 +290,16 @@ const AdminMedicines = () => {
                     value={formData.strength}
                     onChange={(e) => setFormData({ ...formData, strength: e.target.value })}
                     placeholder="e.g., 500mg, 10ml"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>MRP (Rs.) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.mrp}
+                    onChange={(e) => setFormData({ ...formData, mrp: e.target.value })}
+                    required
                   />
                 </div>
               </div>

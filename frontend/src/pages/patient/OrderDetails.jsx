@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { reviewAPI } from '../../services/api';
+import { useNotification } from '../../context/NotificationContext';
 import '../../styles/orderdetails.css';
 
 export default function OrderDetails() {
@@ -12,6 +13,7 @@ export default function OrderDetails() {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewData, setReviewData] = useState({ rating: 5, comment: '' });
   const [submittingReview, setSubmittingReview] = useState(false);
+  const { success, error } = useNotification();
 
   useEffect(() => {
     fetchOrderDetails();
@@ -62,18 +64,18 @@ export default function OrderDetails() {
       await api.patch(`/orders/${id}/cancel`);
       fetchOrderDetails();
     } catch (error) {
-      alert(error.response?.data?.message || 'Failed to cancel order');
+      error(error.response?.data?.message || 'Failed to cancel order');
     }
   };
 
   const handleSubmitReview = async () => {
     if (reviewData.rating < 1 || reviewData.rating > 5) {
-      alert('Please select a rating between 1 and 5');
+      error('Please select a rating between 1 and 5');
       return;
     }
     
     if (!reviewData.comment.trim()) {
-      alert('Please enter a review comment');
+      error('Please enter a review comment');
       return;
     }
 
@@ -85,12 +87,12 @@ export default function OrderDetails() {
         rating: reviewData.rating,
         comment: reviewData.comment
       });
-      alert('Review submitted successfully! Thank you for your feedback.');
+      success('Review submitted successfully! Thank you for your feedback.');
       setShowReviewModal(false);
       setReviewData({ rating: 5, comment: '' });
       fetchOrderDetails();
     } catch (error) {
-      alert(error.response?.data?.message || 'Failed to submit review');
+      error(error.response?.data?.message || 'Failed to submit review');
     } finally {
       setSubmittingReview(false);
     }

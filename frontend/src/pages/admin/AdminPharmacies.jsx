@@ -225,14 +225,14 @@ const AdminPharmacies = () => {
                     <>
                       {selectedPharmacy.permanentClose ? (
                         <button
-                          onClick={() => handleToggleStatus(selectedPharmacy._id, false, 'permanent')}
+                          onClick={() => handleToggleStatus(selectedPharmacy._id, selectedPharmacy.permanentClose, 'permanent')}
                           className="btn btn-success"
                         >
                           Reopen Pharmacy
                         </button>
                       ) : (
                         <button
-                          onClick={() => handleToggleStatus(selectedPharmacy._id, true, 'permanent')}
+                          onClick={() => handleToggleStatus(selectedPharmacy._id, selectedPharmacy.permanentClose, 'permanent')}
                           className="btn btn-danger"
                         >
                           Set Permanent Close

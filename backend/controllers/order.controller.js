@@ -1,5 +1,6 @@
 import Order from '../models/Order.js';
 import Pharmacy from '../models/Pharmacy.js';
+import Stock from '../models/Stock.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
 
 // ================= GET MY ORDERS =================
@@ -129,6 +130,17 @@ export const createOrder = asyncHandler(async (req, res) => {
     subtotal += itemPrice * item.quantity;
   }
 
+  // Validate stock availability before creating order
+  for (const it of orderItems) {
+    const stockDoc = await Stock.findOne({ pharmacy: pharmacyId, medicine: it.medicine });
+    if (!stockDoc) {
+      return sendError(res, 400, `Medicine ${it.medicine} not available at selected pharmacy`);
+    }
+    if (stockDoc.quantity < it.quantity) {
+      return sendError(res, 400, `Insufficient stock for ${stockDoc.medicine}. Requested ${it.quantity}, available ${stockDoc.quantity}`);
+    }
+  }
+
   const tax = Math.round(subtotal * 0.05);
 
   const deliveryCharge =
@@ -172,6 +184,14 @@ export const createOrder = asyncHandler(async (req, res) => {
     'items.medicine',
     'name genericName'
   );
+
+  for (const it of orderItems) {
+    const stockDoc = await Stock.findOne({ pharmacy: pharmacyId, medicine: it.medicine });
+    if (!stockDoc) continue;
+    stockDoc.quantity = Math.max(0, (stockDoc.quantity || 0) - it.quantity);
+    stockDoc.isAvailable = stockDoc.quantity > 0;
+    await stockDoc.save();
+  }
 
   sendSuccess(
     res,
@@ -325,6 +345,14 @@ export const cancelOrder = asyncHandler(async (req, res) => {
     'Cancelled by customer';
 
   await order.save();
+
+  for (const it of order.items) {
+    const stockDoc = await Stock.findOne({ pharmacy: order.pharmacy, medicine: it.medicine });
+    if (!stockDoc) continue;
+    stockDoc.quantity = (stockDoc.quantity || 0) + (it.quantity || 0);
+    stockDoc.isAvailable = stockDoc.quantity > 0;
+    await stockDoc.save();
+  }
 
   sendSuccess(
     res,

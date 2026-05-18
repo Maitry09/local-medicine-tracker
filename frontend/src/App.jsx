@@ -12,6 +12,7 @@ import SearchMedicines from './pages/SearchMedicines';
 import MedicineDetails from './pages/MedicineDetails';
 import PharmacyList from './pages/PharmacyList';
 import PharmacyDetails from './pages/PharmacyDetails';
+import Reviews from './pages/Reviews';
 
 // Auth Pages
 import Login from './pages/auth/Login';
@@ -23,6 +24,7 @@ import ResetPassword from './pages/auth/ResetPassword';
 import PatientDashboard from './pages/patient/Dashboard';
 import PrescriptionUpload from './pages/patient/PrescriptionUpload';
 import MyOrders from './pages/patient/MyOrders';
+import MyReviews from './pages/patient/MyReviews';
 import OrderDetails from './pages/patient/OrderDetails';
 import MyAlerts from './pages/patient/MyAlerts';
 import Cart from './pages/patient/Cart';
@@ -94,10 +96,12 @@ function App() {
         <Route path="/pharmacies" element={<PharmacyList />} />
 
         <Route path="/pharmacies/:id" element={<PharmacyDetails />} />
+        <Route path="/reviews" element={<Reviews />} />
 
-        <Route path="/cart" element={<Cart />} />
-
-        <Route path="/checkout" element={<Checkout />} />
+        <Route element={<ProtectedRoute allowedRoles={['patient']} />}>
+          <Route path="/cart" element={<Cart />} />
+          <Route path="/checkout" element={<Checkout />} />
+        </Route>
       </Route>
 
       {/* AUTH ROUTES */}
@@ -162,6 +166,11 @@ function App() {
           <Route
             path="/alerts"
             element={<MyAlerts />}
+          />
+
+          <Route
+            path="/my-reviews"
+            element={<MyReviews />}
           />
 
           <Route

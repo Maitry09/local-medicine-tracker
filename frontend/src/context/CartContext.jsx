@@ -66,33 +66,33 @@ export const CartProvider = ({ children }) => {
   }, [cartItems]);
 
   const addToCart = (item) => {
+    const finalItem = {
+      ...item,
+      price: Math.round(Number(item.price || 0)),
+      pharmacyPrice: Math.round(Number(item.price || 0))
+    };
 
-  const finalItem = {
-    ...item,
-    price: Math.round(Number(item.price || 0)),
-    pharmacyPrice: Math.round(Number(item.price || 0))
-  };
-
-  setCartItems(prev => {
-
-    const existingItem = prev.find(
-      i => i._id === finalItem._id
-    );
-
-    if (existingItem) {
-      return prev.map(i =>
-        i._id === finalItem._id
-          ? {
-              ...i,
-              quantity: i.quantity + finalItem.quantity
-            }
-          : i
+    setCartItems(prev => {
+      const existingItem = prev.find(
+        i => i._id === finalItem._id
       );
-    }
 
-    return [...prev, finalItem];
-  });
-};
+      if (existingItem) {
+        return prev.map(i =>
+          i._id === finalItem._id
+            ? {
+                ...i,
+                quantity: i.quantity + finalItem.quantity
+              }
+            : i
+        );
+      }
+
+      return [...prev, finalItem];
+    });
+
+    return true;
+  };
 
   // ✅ REMOVE
   const removeFromCart = (  medicineId, pharmacyId) => {
@@ -163,6 +163,10 @@ export const CartProvider = ({ children }) => {
     localStorage.removeItem(CART_STORAGE_KEY);
   };
 
+  const clearPharmacyCart = (pharmacyId) => {
+    setCartItems((prev) => prev.filter((item) => item.pharmacyId !== pharmacyId));
+  };
+
 const getCartTotal = () => {
 
   return cartItems.reduce(
@@ -223,6 +227,7 @@ const getCartTotal = () => {
         removeFromCart,
         updateQuantity,
         clearCart,
+        clearPharmacyCart,
 
         getCartTotal,
         getItemsByPharmacy,

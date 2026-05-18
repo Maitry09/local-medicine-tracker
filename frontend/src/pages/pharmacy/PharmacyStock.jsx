@@ -16,21 +16,24 @@ const PharmacyStock = () => {
     medicine: '',
     quantity: '',
     price: '',
-    lowStockThreshold: '10',
     expiryDate: '',
-    batchNumber: '',
+    batchNumber: ''
   });
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    const timer = setTimeout(() => {
+      fetchData(searchTerm);
+    }, 250);
 
-  const fetchData = async () => {
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const fetchData = async (search = '') => {
     try {
       setLoading(true);
       const [stockRes, medsRes] = await Promise.all([
-        stockAPI.getStocks(),
-        medicineAPI.getMedicines()
+        stockAPI.getMyStock({ search }),
+        medicineAPI.getMedicines({ page: 1, limit: 100 })
       ]);
       setStocks(stockRes.data?.data?.stock || stockRes.data?.data?.stocks || []);
       setMedicines(medsRes.data?.data?.medicines || medsRes.data?.data?.medicine || []);
@@ -44,11 +47,18 @@ const PharmacyStock = () => {
   const handleAddStock = async (e) => {
     e.preventDefault();
     try {
-      await stockAPI.addStock(formData);
+      await stockAPI.addStock({
+        medicineId: formData.medicine,
+        quantity: Number(formData.quantity),
+        price: Number(formData.price),
+        discount: 0,
+        batchNumber: formData.batchNumber,
+        expiryDate: formData.expiryDate || undefined
+      });
       showNotification('Stock added successfully', 'success');
       setShowAddModal(false);
       resetForm();
-      await fetchData();
+      await fetchData(searchTerm);
     } catch (error) {
       showNotification(error.response?.data?.message || 'Failed to add stock', 'error');
     }
@@ -85,7 +95,6 @@ const PharmacyStock = () => {
       medicine: stock.medicine?._id || stock.medicine || '',
       quantity: String(stock.quantity ?? ''),
       price: String(stock.price ?? ''),
-      lowStockThreshold: String(stock.lowStockThreshold ?? '10'),
       expiryDate: stock.expiryDate ? stock.expiryDate.split('T')[0] : '',
       batchNumber: stock.batchNumber || '',
     });
@@ -97,11 +106,14 @@ const PharmacyStock = () => {
       medicine: '',
       quantity: '',
       price: '',
-      lowStockThreshold: '10',
       expiryDate: '',
-      batchNumber: '',
+      batchNumber: ''
     });
   };
+
+  const selectedStockItem = stocks.find(
+    (stock) => stock.medicine?._id === formData.medicine
+  );
 
   const filteredStocks = stocks.filter((stock) =>
     stock.medicine?.name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -170,16 +182,10 @@ const PharmacyStock = () => {
                     className={`badge ${
                       Number(stock.quantity ?? 0) === 0
                         ? 'badge-danger'
-                        : Number(stock.quantity ?? 0) <= Number(stock.lowStockThreshold ?? 0)
-                        ? 'badge-warning'
                         : 'badge-success'
                     }`}
                   >
-                    {stock.quantity === 0
-                      ? 'Out of Stock'
-                      : stock.quantity <= stock.lowStockThreshold
-                      ? 'Low Stock'
-                      : 'In Stock'}
+                    {stock.quantity === 0 ? 'Out of Stock' : 'In Stock'}
                   </span>
                 </td>
                 <td>
@@ -230,6 +236,12 @@ const PharmacyStock = () => {
                   ))}
                 </select>
               </div>
+              {selectedStockItem && (
+                <div className="form-group current-stock-info">
+                  <label>Current stock</label>
+                  <div>{selectedStockItem.quantity ?? 0} units</div>
+                </div>
+              )}
               <div className="form-row">
                 <div className="form-group">
                   <label>Quantity</label>
@@ -252,16 +264,6 @@ const PharmacyStock = () => {
                 </div>
               </div>
               <div className="form-row">
-                <div className="form-group">
-                  <label>Low Stock Threshold</label>
-                  <input
-                    type="number"
-                    value={formData.lowStockThreshold}
-                    onChange={(e) =>
-                      setFormData({ ...formData, lowStockThreshold: e.target.value })
-                    }
-                  />
-                </div>
                 <div className="form-group">
                   <label>Batch Number</label>
                   <input
@@ -329,16 +331,6 @@ const PharmacyStock = () => {
                 </div>
               </div>
               <div className="form-row">
-                <div className="form-group">
-                  <label>Low Stock Threshold</label>
-                  <input
-                    type="number"
-                    value={formData.lowStockThreshold}
-                    onChange={(e) =>
-                      setFormData({ ...formData, lowStockThreshold: e.target.value })
-                    }
-                  />
-                </div>
                 <div className="form-group">
                   <label>Batch Number</label>
                   <input

@@ -4,6 +4,22 @@ import Notification from '../models/Notification.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
 import Stock from '../models/Stock.js';
 
+const normalizePharmacyLocation = (address) => {
+  if (
+    address?.coordinates?.lat !== undefined &&
+    address?.coordinates?.lng !== undefined
+  ) {
+    return {
+      ...address,
+      location: {
+        type: 'Point',
+        coordinates: [Number(address.coordinates.lng), Number(address.coordinates.lat)]
+      }
+    };
+  }
+  return address;
+};
+
 // Get all pharmacies
 // GET /api/pharmacies
 export const getAllPharmacies = asyncHandler(async (req, res) => {
@@ -91,13 +107,31 @@ export const getAllPharmacies = asyncHandler(async (req, res) => {
     ];
 
     const [result] = await Pharmacy.aggregate(pipeline);
-    
     pharmacies = result.pharmacies.map(p => ({
       ...p,
       distance: Math.round(p.distance / 100) / 10  // Convert meters to km with 1 decimal
     }));
-    
     total = result.totalCount[0]?.count || 0;
+
+    // If some approved pharmacies do not have a GeoJSON location yet,
+    // include a few of them to avoid hiding newly created entries.
+    if (pharmacies.length < parseInt(limit, 10)) {
+      const missingLocationQuery = {
+        ...matchStage,
+        'address.location': { $exists: false }
+      };
+
+      const missingPharmacies = await Pharmacy.find(missingLocationQuery)
+        .populate('owner', 'name email phone')
+        .sort({ rating: -1 })
+        .limit(parseInt(limit, 10) - pharmacies.length);
+
+      if (missingPharmacies.length > 0) {
+        pharmacies = [...pharmacies, ...missingPharmacies];
+        const missingCount = await Pharmacy.countDocuments(missingLocationQuery);
+        total += missingCount;
+      }
+    }
 
   } else {
     // No location filter — standard query sorted by rating
@@ -202,6 +236,7 @@ export const registerPharmacy = asyncHandler(async (req, res) => {
 
   const pharmacy = await Pharmacy.create({
     ...req.body,
+    address: normalizePharmacyLocation(req.body.address),
     owner: req.userId,
     email: req.user.email
   });
@@ -232,7 +267,7 @@ export const updateMyPharmacy = asyncHandler(async (req, res) => {
   const updatePayload = {
     name,
     phone,
-    address,
+    address: normalizePharmacyLocation(address),
     operatingHours
   };
 
@@ -244,11 +279,8 @@ export const updateMyPharmacy = asyncHandler(async (req, res) => {
     updatePayload.defaultDeliveryFee = defaultDeliveryFee;
   }
 
-  const updated = await Pharmacy.findByIdAndUpdate(
-    pharmacy._id,
-    updatePayload,
-    { new: true, runValidators: true }
-  );
+  pharmacy.set(updatePayload);
+  const updated = await pharmacy.save();
 
   sendSuccess(res, 200, { pharmacy: updated }, 'Pharmacy updated successfully');
 });
@@ -268,7 +300,7 @@ export const getMyPharmacy = asyncHandler(async (req, res) => {
 export const verifyPharmacy = asyncHandler(async (req, res) => {
   const pharmacy = await Pharmacy.findByIdAndUpdate(
     req.params.id,
-    { status: 'approved', isVerified: true, rejectionReason: undefined },
+    { status: 'approved', isVerified: true, isActive: true, rejectionReason: undefined },
     { new: true }
   );
 

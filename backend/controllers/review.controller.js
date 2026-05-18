@@ -103,3 +103,19 @@ export const getMyReviews = asyncHandler(async (req, res) => {
 
   sendSuccess(res, 200, { reviews, pagination: { current: parseInt(page), pages: Math.ceil(total / limit), total } }, 'Your reviews fetched');
 });
+
+// Get all reviews (public)
+export const getAllReviews = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 20 } = req.query;
+
+  const reviews = await Review.find({})
+    .populate('user', 'name')
+    .populate('pharmacy', 'name')
+    .limit(limit * 1)
+    .skip((page - 1) * limit)
+    .sort({ createdAt: -1 });
+
+  const total = await Review.countDocuments({});
+
+  sendSuccess(res, 200, { reviews, pagination: { current: parseInt(page), pages: Math.ceil(total / limit), total } }, 'All reviews fetched');
+});

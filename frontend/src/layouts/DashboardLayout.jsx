@@ -15,7 +15,8 @@ const DashboardLayout = () => {
     { path: '/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/orders', label: 'My Orders', icon: '📦' },
     { path: '/alerts', label: 'My Alerts', icon: '🔔' },
-    { path: '/search', label: 'Search Medicines', icon: '🔍' }
+    { path: '/search', label: 'Search Medicines', icon: '🔍' },
+    { path: '/my-reviews', label: 'My Reviews', icon: '✍️' }
   ];
 
   const pharmacyLinks = [

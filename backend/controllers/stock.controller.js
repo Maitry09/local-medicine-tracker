@@ -4,18 +4,48 @@ import Pharmacy from '../models/Pharmacy.js';
 import Alert from '../models/Alert.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
 
-// Get my pharmacy stock (pharmacy owner)
+const resolvePharmacyForUser = async (req) => {
+  let pharmacy = await Pharmacy.findOne({ owner: req.userId });
+  if (!pharmacy && req.user.pharmacyId) {
+    pharmacy = await Pharmacy.findById(req.user.pharmacyId);
+  }
+  return pharmacy;
+};
+
+// Get my pharmacy stock (pharmacy owner or admin)
 // GET /api/stock/
 export const getMyStock = asyncHandler(async (req, res) => {
-  const pharmacy = await Pharmacy.findOne({ owner: req.userId });
+  let pharmacy;
+  let stockQuery = {};
+  const { search, pharmacyId } = req.query;
 
-  if (!pharmacy) {
-    return sendError(res, 404, 'Pharmacy not found');
+  if (req.user.role === 'admin') {
+    if (pharmacyId) {
+      pharmacy = await Pharmacy.findById(pharmacyId);
+      if (!pharmacy) {
+        return sendError(res, 404, 'Pharmacy not found');
+      }
+      stockQuery.pharmacy = pharmacy._id;
+    }
+  } else {
+    pharmacy = await resolvePharmacyForUser(req);
+    if (!pharmacy) {
+      return sendError(res, 404, 'Pharmacy not found');
+    }
+    stockQuery.pharmacy = pharmacy._id;
   }
 
-  const stock = await Stock.find({ pharmacy: pharmacy._id })
+  let stock = await Stock.find(stockQuery)
     .populate('medicine')
     .sort({ createdAt: -1 });
+
+  if (search) {
+    const searchLower = search.toLowerCase();
+    stock = stock.filter((item) => {
+      return item.medicine?.name?.toLowerCase().includes(searchLower) ||
+        item.medicine?.genericName?.toLowerCase().includes(searchLower);
+    });
+  }
 
   sendSuccess(
     res,
@@ -31,7 +61,7 @@ export const getMyStock = asyncHandler(async (req, res) => {
 export const addStock = asyncHandler(async (req, res) => {
   const { medicineId, quantity, price, discount, batchNumber, expiryDate } = req.body;
 
-  const pharmacy = await Pharmacy.findOne({ owner: req.userId });
+  const pharmacy = await resolvePharmacyForUser(req);
   
   if (!pharmacy) {
     return sendError(res, 404, 'Pharmacy not found');
@@ -50,7 +80,16 @@ export const addStock = asyncHandler(async (req, res) => {
   });
 
   if (existingStock) {
-    return sendError(res, 400, 'Stock for this medicine already exists. Use update instead.');
+    existingStock.quantity = Number(existingStock.quantity || 0) + Number(quantity || 0);
+    if (price !== undefined) existingStock.price = price;
+    if (discount !== undefined) existingStock.discount = discount;
+    if (batchNumber !== undefined) existingStock.batchNumber = batchNumber;
+    if (expiryDate !== undefined) existingStock.expiryDate = expiryDate;
+    existingStock.isAvailable = existingStock.quantity > 0;
+    await existingStock.save();
+    await existingStock.populate('medicine');
+
+    return sendSuccess(res, 200, { stock: existingStock }, 'Stock updated successfully');
   }
 
   const stock = await Stock.create({
@@ -85,7 +124,7 @@ export const addStock = asyncHandler(async (req, res) => {
 export const updateStock = asyncHandler(async (req, res) => {
   const { quantity, price, discount, batchNumber, expiryDate, isAvailable } = req.body;
 
-  const pharmacy = await Pharmacy.findOne({ owner: req.userId });
+  const pharmacy = await resolvePharmacyForUser(req);
   
   if (!pharmacy) {
     return sendError(res, 404, 'Pharmacy not found');
@@ -135,7 +174,7 @@ export const updateStock = asyncHandler(async (req, res) => {
 
 // Delete stock item (pharmacy owner)
 export const deleteStock = asyncHandler(async (req, res) => {
-  const pharmacy = await Pharmacy.findOne({ owner: req.userId });
+  const pharmacy = await resolvePharmacyForUser(req);
   
   if (!pharmacy) {
     return sendError(res, 404, 'Pharmacy not found');
@@ -157,7 +196,7 @@ export const deleteStock = asyncHandler(async (req, res) => {
 export const bulkUpdateStock = asyncHandler(async (req, res) => {
   const { items } = req.body;
 
-  const pharmacy = await Pharmacy.findOne({ owner: req.userId });
+  const pharmacy = await resolvePharmacyForUser(req);
   
   if (!pharmacy) {
     return sendError(res, 404, 'Pharmacy not found');

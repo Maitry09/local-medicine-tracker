@@ -9,6 +9,7 @@ const PharmacyList = () => {
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ current: 1, pages: 1, total: 0 });
   const [userLocation, setUserLocation] = useState(null);
+  const [locationReady, setLocationReady] = useState(false);
 
   const [filters, setFilters] = useState({
     search: searchParams.get('search') || '',
@@ -25,17 +26,21 @@ const PharmacyList = () => {
             lat: position.coords.latitude,
             lng: position.coords.longitude
           });
+          setLocationReady(true);
         },
         () => {
-          setUserLocation({ lat: 28.6139, lng: 77.209 }); // fallback
+          setLocationReady(true);
         }
       );
+    } else {
+      setLocationReady(true);
     }
   }, []);
 
   useEffect(() => {
+    if (!locationReady) return;
     fetchPharmacies();
-  }, [filters.search, filters.city, filters.is24Hours, filters.page, userLocation?.lat, userLocation?.lng]);
+  }, [filters.search, filters.city, filters.is24Hours, filters.page, userLocation, locationReady]);
 
   const fetchPharmacies = async () => {
     setLoading(true);

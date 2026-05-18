@@ -33,6 +33,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
       { $group: { _id: null, total: { $sum: '$total' } } }
     ])
   ]);
+  const pendingPharmacies = await Pharmacy.countDocuments({ status: 'pending' });
   const users = await User.find();
 
   const pharmacies = await Pharmacy.find()
@@ -86,7 +87,8 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
     },
     pharmacies: {
       total: totalPharmacies,
-      verified: verifiedPharmacies
+      verified: verifiedPharmacies,
+      pending: pendingPharmacies
     },
     medicines: totalMedicines,
     orders: {
@@ -217,6 +219,18 @@ export const updatePharmacyAdmin = asyncHandler(async (req, res) => {
   if (typeof isActive !== 'undefined') update.isActive = isActive;
   if (typeof rating !== 'undefined') update.rating = rating;
   if (typeof permanentClose !== 'undefined') update.permanentClose = permanentClose;
+  // If admin sets permanentClose, enforce disabled state and hide from public
+  if (typeof permanentClose !== 'undefined') {
+    if (permanentClose === true) {
+      update.isActive = false;
+      update.status = 'disabled';
+    } else {
+      // Reopening: reactivate and mark as approved
+      update.isActive = true;
+      update.status = 'approved';
+      update.rejectionReason = undefined;
+    }
+  }
   if (typeof tempCloseUntil !== 'undefined') update.tempCloseUntil = tempCloseUntil;
 
   // Handle rejection reason
@@ -236,6 +250,30 @@ export const updatePharmacyAdmin = asyncHandler(async (req, res) => {
 
   if (!pharmacy) {
     return sendError(res, 404, 'Pharmacy not found');
+  }
+
+  // If admin disabled the pharmacy permanently, also deactivate the owner user account
+  try {
+    if (typeof permanentClose !== 'undefined') {
+      const ownerId = pharmacy.owner?._id || pharmacy.owner;
+      if (ownerId) {
+        if (permanentClose === true) {
+          await User.findByIdAndUpdate(ownerId, { isActive: false, refreshToken: null });
+        } else {
+          await User.findByIdAndUpdate(ownerId, { isActive: true });
+        }
+      }
+    }
+    // Additionally, if status was set to 'disabled', make sure owner account is deactivated
+    if (update.isActive === false || update.status === 'disabled') {
+      const ownerId = pharmacy.owner?._id || pharmacy.owner;
+      if (ownerId) {
+        await User.findByIdAndUpdate(ownerId, { isActive: false, refreshToken: null });
+      }
+    }
+  } catch (err) {
+    // Non-fatal: log but continue
+    console.error('Failed to update owner active status after pharmacy update:', err);
   }
 
   // Notify owner if rejection or approval

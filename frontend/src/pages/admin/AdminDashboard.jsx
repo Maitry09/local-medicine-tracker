@@ -68,9 +68,7 @@ const AdminDashboard = () => {
         totalPharmacies: data.pharmacies?.total || 0,
         totalMedicines: data.medicines || 0,
         totalOrders: data.orders?.total || 0,
-        pendingApprovals: data.pharmacies?.total && data.pharmacies?.verified !== undefined
-          ? data.pharmacies.total - data.pharmacies.verified
-          : 0,
+        pendingApprovals: data.pharmacies?.pending || 0,
         revenue: data.revenue?.total || 0,
       });
       setRecentActivity(data.recentOrders || []);

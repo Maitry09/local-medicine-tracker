@@ -89,6 +89,10 @@ const MedicineDetails = () => {
     }
   };
  const handleAddToCart = (pharmacy) => {
+  if (!user) {
+    navigate('/login');
+    return;
+  }
 
   const selected = pharmacy || selectedPharmacy;
 
@@ -120,8 +124,10 @@ const MedicineDetails = () => {
     stock: selected.stock
   };
 
-  addToCart(cartItem);
-  success('Added to cart');
+  const added = addToCart(cartItem);
+  if (added) {
+    success('Added to cart');
+  }
 };
 
   const handleCreateAlert = async () => {
@@ -334,7 +340,7 @@ const MedicineDetails = () => {
 
                 <button
                   className="btn btn-primary"
-                  onClick={handleAddToCart}
+                  onClick={handleCreateAlert}
                 >
                   Notify Me When Available
                 </button>
