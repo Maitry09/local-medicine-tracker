@@ -21,6 +21,7 @@ const PharmacyDetails = () => {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewData, setReviewData] = useState({ rating: 5, comment: '' });
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [editingReviewId, setEditingReviewId] = useState(null);
 
   useEffect(() => {
     fetchPharmacyDetails();
@@ -66,20 +67,52 @@ const PharmacyDetails = () => {
     setSubmittingReview(true);
 
     try {
-      await reviewAPI.create({
-        pharmacyId: id,
-        rating: reviewData.rating,
-        comment: reviewData.comment
-      });
-      success('Review submitted successfully');
+      if (editingReviewId) {
+        // Update existing review
+        await reviewAPI.update(editingReviewId, {
+          rating: reviewData.rating,
+          comment: reviewData.comment
+        });
+        success('Review updated successfully');
+      } else {
+        // Create new review
+        await reviewAPI.create({
+          pharmacyId: id,
+          rating: reviewData.rating,
+          comment: reviewData.comment
+        });
+        success('Review submitted successfully');
+      }
       setShowReviewModal(false);
       setReviewData({ rating: 5, comment: '' });
+      setEditingReviewId(null);
       fetchReviews();
     } catch (error) {
       console.error('Failed to submit review:', error);
       alert(error.response?.data?.message || 'Failed to submit review');
     } finally {
       setSubmittingReview(false);
+    }
+  };
+
+  const handleEditReview = (review) => {
+    setReviewData({ rating: review.rating, comment: review.comment });
+    setEditingReviewId(review._id);
+    setShowReviewModal(true);
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    if (!window.confirm('Are you sure you want to delete this review?')) {
+      return;
+    }
+
+    try {
+      await reviewAPI.delete(reviewId);
+      success('Review deleted successfully');
+      fetchReviews();
+    } catch (error) {
+      console.error('Failed to delete review:', error);
+      alert(error.response?.data?.message || 'Failed to delete review');
     }
   };
 
@@ -238,13 +271,40 @@ const PharmacyDetails = () => {
         <div className="card mb-4">
           <div className="card-body">
             {reviews.slice(0, 3).map((review) => (
-              <div key={review._id} style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                  <strong>{review.user?.name || 'Customer'}</strong>
-                  <span style={{ color: '#ffc107' }}>★ {review.rating.toFixed(1)}</span>
+              <div key={review._id} style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #e5e7eb' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '1rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.25rem' }}>
+                      <strong>{review.user?.name || 'Customer'}</strong>
+                      <span style={{ color: '#ffc107' }}>★ {review.rating.toFixed(1)}</span>
+                    </div>
+                    <p className="text-muted" style={{ margin: '0.25rem 0', fontSize: '0.875rem' }}>
+                      {new Date(review.createdAt).toLocaleDateString('en-IN')}
+                      {review.editCount > 0 && <span style={{ marginLeft: '0.5rem', fontStyle: 'italic' }}>(edited)</span>}
+                    </p>
+                    <p style={{ marginTop: '0.5rem' }}>{review.comment}</p>
+                  </div>
+                  {user && review.user?._id === user._id && (
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => handleEditReview(review)}
+                        disabled={review.editCount >= 1}
+                        title={review.editCount >= 1 ? 'Review can only be edited once' : 'Edit review'}
+                        style={{ padding: '0.25rem 0.75rem', fontSize: '0.875rem' }}
+                      >
+                        {review.editCount >= 1 ? '✓ Edited' : 'Edit'}
+                      </button>
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => handleDeleteReview(review._id)}
+                        style={{ padding: '0.25rem 0.75rem', fontSize: '0.875rem', color: '#dc2626', borderColor: '#dc2626' }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <p className="text-muted" style={{ margin: '0.25rem 0' }}>{new Date(review.createdAt).toLocaleDateString('en-IN')}</p>
-                <p>{review.comment}</p>
               </div>
             ))}
             {reviews.length > 3 && (

@@ -152,7 +152,9 @@ export const savedMedicineAPI = {
 // Reviews
 export const reviewAPI = {
   create: (data) => api.post('/reviews', data),
-  getByPharmacy: (pharmacyId, params) => api.get(`/reviews/pharmacy/${pharmacyId}`, { params })
+  getByPharmacy: (pharmacyId, params) => api.get(`/reviews/pharmacy/${pharmacyId}`, { params }),
+  update: (id, data) => api.put(`/reviews/${id}`, data),
+  delete: (id) => api.delete(`/reviews/${id}`)
 };
 
 // Order API

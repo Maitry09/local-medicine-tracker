@@ -388,3 +388,37 @@ export const getAllOrders = asyncHandler(async (req, res) => {
     'Orders fetched successfully'
   );
 });
+
+export const updateCODPaymentStatus = asyncHandler(async (req, res) => {
+  const { paymentStatus } = req.body;
+
+  if (!['paid', 'pending'].includes(paymentStatus)) {
+    return sendError(res, 400, 'Invalid payment status. Use "paid" or "pending".');
+  }
+
+  const pharmacy = await Pharmacy.findOne({ owner: req.userId });
+
+  if (!pharmacy && req.user.role !== 'admin') {
+    return sendError(res, 404, 'Pharmacy not found');
+  }
+
+  const query = { _id: req.params.id, paymentMethod: 'cod' };
+  if (req.user.role !== 'admin') {
+    query.pharmacy = pharmacy._id;
+  }
+
+  const order = await Order.findOne(query);
+
+  if (!order) {
+    return sendError(res, 404, 'COD order not found');
+  }
+
+  order.paymentStatus = paymentStatus;
+  await order.save();
+
+  await order.populate('pharmacy', 'name address phone');
+  await order.populate('user', 'name email phone');
+  await order.populate('items.medicine', 'name');
+
+  sendSuccess(res, 200, { order }, `COD payment marked as ${paymentStatus}`);
+});

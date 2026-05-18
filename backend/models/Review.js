@@ -29,9 +29,18 @@ const reviewSchema = new mongoose.Schema({
   isVerifiedPurchase: {
     type: Boolean,
     default: false
+  },
+  editCount: {
+    type: Number,
+    default: 0
+  },
+  lastEditedAt: {
+    type: Date
   }
 }, { timestamps: true });
 
-reviewSchema.index({ order: 1 }, { unique: true });
+// Index for faster queries, but not unique anymore (users can leave multiple reviews)
+reviewSchema.index({ pharmacy: 1, user: 1 });
+reviewSchema.index({ order: 1 });
 
 export default mongoose.model('Review', reviewSchema);
