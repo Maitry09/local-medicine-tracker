@@ -73,6 +73,10 @@ const orderSchema = new mongoose.Schema({
     enum: ['razorpay', 'cod'],
     default: 'razorpay'
   },
+  prescriptionStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected']
+  },
   deliveryAddress: {
     street: String,
     city: String,

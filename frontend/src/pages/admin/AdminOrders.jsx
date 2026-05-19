@@ -13,6 +13,20 @@ const AdminOrders = () => {
   const { showNotification } = useNotification();
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+
+    if (selectedOrder) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = previousOverflow;
+    }
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [selectedOrder]);
+
+  useEffect(() => {
     fetchOrders();
   }, [page, filter]);
 
@@ -48,6 +62,17 @@ const AdminOrders = () => {
       cancelled: 'badge-danger',
     };
     return `badge ${colors[status] || 'badge-secondary'}`;
+  };
+
+  const getPrescriptionImageUrl = (imageUrl) => {
+    if (!imageUrl) return '';
+    return imageUrl.startsWith('http')
+      ? imageUrl
+      : `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5002'}${imageUrl}`;
+  };
+
+  const isPrescriptionPreviewable = (imageUrl) => {
+    return imageUrl && !imageUrl.toLowerCase().endsWith('.pdf');
   };
 
   const totalRevenue = orders
@@ -222,6 +247,30 @@ const AdminOrders = () => {
                   ))}
                 </div>
               </section>
+
+              {selectedOrder.prescriptionImage && (
+                <section>
+                  <h3>Prescription</h3>
+                  <div style={{ marginTop: 8 }}>
+                    {isPrescriptionPreviewable(selectedOrder.prescriptionImage) ? (
+                      <a href={getPrescriptionImageUrl(selectedOrder.prescriptionImage)} target="_blank" rel="noreferrer">
+                        <img
+                          src={getPrescriptionImageUrl(selectedOrder.prescriptionImage)}
+                          alt="Prescription"
+                          style={{ width: '100%', maxWidth: 520, borderRadius: 12, border: '1px solid #ddd', marginTop: 12 }}
+                        />
+                      </a>
+                    ) : (
+                      <a href={getPrescriptionImageUrl(selectedOrder.prescriptionImage)} target="_blank" rel="noreferrer" className="link">
+                        View uploaded prescription document
+                      </a>
+                    )}
+                  </div>
+                  <p style={{ marginTop: 8, color: '#555' }}>
+                    Prescription status: <strong>{selectedOrder.prescriptionStatus || 'pending'}</strong>
+                  </p>
+                </section>
+              )}
 
               <section>
                 <h3>Order Timeline</h3>

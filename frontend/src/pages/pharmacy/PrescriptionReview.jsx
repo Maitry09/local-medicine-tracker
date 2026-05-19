@@ -12,6 +12,13 @@ export default function PrescriptionReview() {
   const [rejectingId, setRejectingId] = useState(null);
   const { showNotification } = useNotification();
 
+  const getPrescriptionImageUrl = (imageUrl) => {
+    if (!imageUrl) return '';
+    return imageUrl.startsWith('http')
+      ? imageUrl
+      : `${API_BASE}${imageUrl}`;
+  };
+
   useEffect(() => { fetchPrescriptions(); }, []);
 
   const fetchPrescriptions = async () => {
@@ -66,8 +73,8 @@ export default function PrescriptionReview() {
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                   {/* Image */}
                   <div style={{ flexShrink: 0 }}>
-                    <a href={`${API_BASE}${p.imageUrl}`} target="_blank" rel="noreferrer">
-                      <img src={`${API_BASE}${p.imageUrl}`} alt="Prescription"
+                    <a href={getPrescriptionImageUrl(p.imageUrl)} target="_blank" rel="noreferrer">
+                      <img src={getPrescriptionImageUrl(p.imageUrl)} alt="Prescription"
                         style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 8, border: '1px solid #eee' }}
                         onError={e => { e.target.style.display = 'none'; }} />
                     </a>

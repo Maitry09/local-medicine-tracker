@@ -28,10 +28,17 @@ export default function PrescriptionUpload() {
       if (orderId) {
         formData.append('orderId', orderId);
       }
-      await api.post('/prescriptions/upload', formData, {
+      const response = await api.post('/prescriptions/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      showNotification('✅ Prescription uploaded! Pharmacy will review shortly.', 'success', 4000);
+      const suggestions = response.data?.data?.suggestions || [];
+      showNotification(
+        suggestions.length
+          ? `✅ Prescription uploaded! Suggested medicines: ${suggestions.map((item) => item.name).join(', ')}`
+          : '✅ Prescription uploaded! Pharmacy will review shortly.',
+        'success',
+        6000
+      );
       navigate(orderId ? `/orders/${orderId}` : '/dashboard');
     } catch (err) {
       showNotification(err.response?.data?.message || 'Upload failed', 'error', 4000);

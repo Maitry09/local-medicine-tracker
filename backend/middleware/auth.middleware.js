@@ -1,6 +1,7 @@
 import logger from '../utils/logger.js';
 import { verifyAccessToken } from '../utils/jwt.js';
 import User from '../models/User.js';
+import Pharmacy from '../models/Pharmacy.js';
 import { sendError } from '../utils/errorHandler.js';
 
 // Middleware to verify JWT token
@@ -35,6 +36,14 @@ export const authMiddleware = async (req, res, next) => {
     if (!user.isActive) {
       logger.debug('User account is deactivated');
       return sendError(res, 401, 'Your account has been deactivated by an administrator');
+    }
+
+    if (user.role === 'pharmacy' && user.pharmacyId) {
+      const pharmacy = await Pharmacy.findById(user.pharmacyId).select('isPermanentClose status isActive');
+      if (pharmacy && (pharmacy.isPermanentClose || pharmacy.status === 'disabled' || !pharmacy.isActive)) {
+        logger.debug('Pharmacy account permanently closed or disabled');
+        return sendError(res, 401, 'Your pharmacy account has been disabled. Contact support for assistance.');
+      }
     }
 
     // Attach user to request
@@ -226,14 +235,21 @@ export const requirePharmacyOwnership = (Model, paramName = 'id') => {
 export const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       const decoded = verifyAccessToken(token);
-      
+
       if (decoded) {
         const user = await User.findById(decoded.userId);
         if (user && user.isActive) {
+          if (user.role === 'pharmacy' && user.pharmacyId) {
+            const pharmacy = await Pharmacy.findById(user.pharmacyId).select('isPermanentClose status isActive');
+            if (pharmacy && (pharmacy.isPermanentClose || pharmacy.status === 'disabled' || !pharmacy.isActive)) {
+              return next();
+            }
+          }
+
           req.user = user;
           req.userId = decoded.userId;
           req.userRole = decoded.role;
@@ -241,12 +257,10 @@ export const optionalAuth = async (req, res, next) => {
         }
       }
     }
-    
-    next();
   } catch (error) {
     // Silent fail for optional auth
-    next();
   }
+  next();
 };
 
 // Export all permissions for documentation/testing

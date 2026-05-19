@@ -68,6 +68,10 @@ const pharmacySchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isPermanentClose: {
+    type: Boolean,
+    default: false
+  },
   tempCloseUntil: {
     type: Date,
     default: null
@@ -115,6 +119,15 @@ pharmacySchema.pre('save', function(next) {
       coordinates: [this.address.coordinates.lng, this.address.coordinates.lat]
     };
   }
+
+  // Keep both close flags in sync for backward compatibility
+  if (this.isPermanentClose) {
+    this.permanentClose = true;
+  }
+  if (this.permanentClose) {
+    this.isPermanentClose = true;
+  }
+
   next();
 });
 

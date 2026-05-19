@@ -24,7 +24,16 @@ const AdminPharmacies = () => {
       if (filter === 'verified') params.status = 'approved';
       
       const response = await adminAPI.getAllPharmacies(params);
-      setPharmacies(response.data?.data?.pharmacies || []);
+      const fetched = response.data?.data?.pharmacies || [];
+      setPharmacies(fetched);
+      if (selectedPharmacy) {
+        const updated = fetched.find((p) => p._id === selectedPharmacy._id);
+        if (updated) {
+          setSelectedPharmacy(updated);
+        } else {
+          setSelectedPharmacy(null);
+        }
+      }
     } catch (error) {
       showNotification('Failed to fetch pharmacies', 'error');
     } finally {
@@ -61,18 +70,22 @@ const AdminPharmacies = () => {
   };
 
   const handleToggleStatus = async (pharmacyId, currentStatus, mode = 'permanent') => {
-    // Toggle permanentClose when mode === 'permanent'
+    // Toggle permanent close when mode === 'permanent'
     try {
       const payload = {};
       if (mode === 'permanent') {
-        payload.permanentClose = !currentStatus; // Toggle the current status
+        payload.isPermanentClose = !currentStatus;
       } else {
         // fallback toggle isActive
         payload.isActive = !currentStatus;
       }
 
-      await adminAPI.updatePharmacy(pharmacyId, payload);
+      const response = await adminAPI.updatePharmacy(pharmacyId, payload);
       showNotification('Pharmacy status updated', 'success');
+      const updatedPharmacy = response.data?.data?.pharmacy;
+      if (updatedPharmacy && selectedPharmacy?._id === pharmacyId) {
+        setSelectedPharmacy(updatedPharmacy);
+      }
       fetchPharmacies();
     } catch (error) {
       showNotification('Failed to update pharmacy status', 'error');
@@ -194,8 +207,8 @@ const AdminPharmacies = () => {
                 <section>
                   <h3>Status</h3>
                   <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                    <span className={`badge ${selectedPharmacy.permanentClose ? 'badge-danger' : 'badge-success'}`}>
-                      {selectedPharmacy.permanentClose ? '🔒 Permanently Closed' : '✅ Open'}
+                    <span className={`badge ${selectedPharmacy.isPermanentClose ? 'badge-danger' : 'badge-success'}`}>
+                      {selectedPharmacy.isPermanentClose ? '🔒 Permanently Closed' : '✅ Open'}
                     </span>
                     {selectedPharmacy.tempCloseUntil && new Date(selectedPharmacy.tempCloseUntil) > new Date() && (
                       <span className={`badge badge-warning`}>
@@ -204,6 +217,15 @@ const AdminPharmacies = () => {
                     )}
                   </div>
                 </section>
+
+                {selectedPharmacy.isPermanentClose && (
+                  <section className="admin-warning-box">
+                    <h3>Warning</h3>
+                    <p>
+                      This pharmacy is permanently closed. The owner account is blocked from logging in and the pharmacy will be hidden from the public listing.
+                    </p>
+                  </section>
+                )}
 
                 <div className="panel-actions">
                   {selectedPharmacy.status === 'pending' ? (
@@ -223,16 +245,16 @@ const AdminPharmacies = () => {
                     </>
                   ) : selectedPharmacy.status === 'approved' ? (
                     <>
-                      {selectedPharmacy.permanentClose ? (
+                      {selectedPharmacy.isPermanentClose ? (
                         <button
-                          onClick={() => handleToggleStatus(selectedPharmacy._id, selectedPharmacy.permanentClose, 'permanent')}
+                          onClick={() => handleToggleStatus(selectedPharmacy._id, selectedPharmacy.isPermanentClose, 'permanent')}
                           className="btn btn-success"
                         >
                           Reopen Pharmacy
                         </button>
                       ) : (
                         <button
-                          onClick={() => handleToggleStatus(selectedPharmacy._id, selectedPharmacy.permanentClose, 'permanent')}
+                          onClick={() => handleToggleStatus(selectedPharmacy._id, selectedPharmacy.isPermanentClose, 'permanent')}
                           className="btn btn-danger"
                         >
                           Set Permanent Close

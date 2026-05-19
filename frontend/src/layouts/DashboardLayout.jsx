@@ -33,7 +33,8 @@ const DashboardLayout = () => {
     { path: '/admin/users', label: 'Manage Users', icon: '👥' },
     { path: '/admin/pharmacies', label: 'Manage Pharmacies', icon: '🏥' },
     { path: '/admin/medicines', label: 'Manage Medicines', icon: '💊' },
-    { path: '/admin/orders', label: 'All Orders', icon: '📦' }
+    { path: '/admin/orders', label: 'All Orders', icon: '📦' },
+    { path: '/admin/prescriptions', label: 'Prescriptions', icon: '📄' }
   ];
 
   const getLinks = () => {

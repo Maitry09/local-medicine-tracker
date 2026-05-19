@@ -162,7 +162,7 @@ export const getAllPharmaciesAdmin = asyncHandler(async (req, res) => {
       let isOpen = true;
 
       // If permanently closed
-      if (p.permanentClose) {
+      if (p.isPermanentClose || p.permanentClose) {
         isOpen = false;
       }
 
@@ -212,16 +212,17 @@ export const getAllPharmaciesAdmin = asyncHandler(async (req, res) => {
 
 // Update pharmacy (admin)
 export const updatePharmacyAdmin = asyncHandler(async (req, res) => {
-  const { status, isActive, rating, rejectionReason, permanentClose, tempCloseUntil } = req.body;
+  const { status, isActive, rating, rejectionReason, isPermanentClose, tempCloseUntil } = req.body;
 
   const update = {};
   if (typeof status !== 'undefined') update.status = status;
   if (typeof isActive !== 'undefined') update.isActive = isActive;
   if (typeof rating !== 'undefined') update.rating = rating;
-  if (typeof permanentClose !== 'undefined') update.permanentClose = permanentClose;
+  if (typeof isPermanentClose !== 'undefined') update.isPermanentClose = isPermanentClose;
+  if (typeof isPermanentClose !== 'undefined') update.permanentClose = isPermanentClose;
   // If admin sets permanentClose, enforce disabled state and hide from public
-  if (typeof permanentClose !== 'undefined') {
-    if (permanentClose === true) {
+  if (typeof isPermanentClose !== 'undefined') {
+    if (isPermanentClose === true) {
       update.isActive = false;
       update.status = 'disabled';
     } else {
@@ -254,10 +255,10 @@ export const updatePharmacyAdmin = asyncHandler(async (req, res) => {
 
   // If admin disabled the pharmacy permanently, also deactivate the owner user account
   try {
-    if (typeof permanentClose !== 'undefined') {
+    if (typeof isPermanentClose !== 'undefined') {
       const ownerId = pharmacy.owner?._id || pharmacy.owner;
       if (ownerId) {
-        if (permanentClose === true) {
+        if (isPermanentClose === true) {
           await User.findByIdAndUpdate(ownerId, { isActive: false, refreshToken: null });
         } else {
           await User.findByIdAndUpdate(ownerId, { isActive: true });

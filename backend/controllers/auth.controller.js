@@ -1,4 +1,5 @@
 import User from '../models/User.js';
+import Pharmacy from '../models/Pharmacy.js';
 import { generateTokenPair, verifyRefreshToken, generateAccessToken } from '../utils/jwt.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
 import { sendPasswordResetEmail } from '../services/emailService.js';
@@ -85,11 +86,21 @@ export const login = asyncHandler(async (req, res) => {
   const user = await User.findOne({ email }).select('+password');
   
   if (!user) {
-    return sendError(res, 401, 'Invalid email or password');
+    return sendError(res, 401, 'You must create an account first');
   }
 
   if (!user.isActive) {
     return sendError(res, 401, 'Your account has been deactivated by an administrator');
+  }
+
+  if (user.role === 'pharmacy' && user.pharmacyId) {
+    const pharmacy = await Pharmacy.findById(user.pharmacyId).select('isPermanentClose status isActive');
+    if (pharmacy && pharmacy.isPermanentClose) {
+      return sendError(res, 401, 'Your pharmacy has been permanently closed. You cannot log in.');
+    }
+    if (pharmacy && (pharmacy.status === 'disabled' || !pharmacy.isActive)) {
+      return sendError(res, 401, 'Your pharmacy account has been disabled. Contact support for assistance.');
+    }
   }
 
   // Check password
@@ -127,21 +138,34 @@ export const refreshToken = asyncHandler(async (req, res) => {
     return sendError(res, 400, 'Refresh token is required');
   }
 
-  // Verify refresh token
+  // Verify refresh token signature first
   const decoded = verifyRefreshToken(token);
   if (!decoded) {
     return sendError(res, 401, 'Invalid or expired refresh token');
   }
 
-  // Find user with matching refresh token
+  // Find user
   const user = await User.findById(decoded.userId).select('+refreshToken');
   
-  if (!user || user.refreshToken !== token) {
-    return sendError(res, 401, 'Invalid refresh token');
+  if (!user) {
+    return sendError(res, 401, 'User not found');
   }
 
   if (!user.isActive) {
     return sendError(res, 401, 'Your account has been deactivated by an administrator');
+  }
+
+  // Check pharmacy status BEFORE checking token match (so deactivated pharmacy owners get the right error)
+  if (user.role === 'pharmacy' && user.pharmacyId) {
+    const pharmacy = await Pharmacy.findById(user.pharmacyId).select('isPermanentClose status isActive');
+    if (pharmacy && (pharmacy.isPermanentClose || pharmacy.status === 'disabled' || !pharmacy.isActive)) {
+      return sendError(res, 401, 'Your pharmacy account has been disabled. Contact support for assistance.');
+    }
+  }
+
+  // Now check if token matches (after pharmacy validation so they know why they can't refresh)
+  if (user.refreshToken !== token) {
+    return sendError(res, 401, 'Invalid refresh token');
   }
 
   // Generate new access token

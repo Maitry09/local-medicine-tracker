@@ -34,7 +34,8 @@ export const getAllPharmacies = asyncHandler(async (req, res) => {
     search
   } = req.query;
 
-  const query = { isActive: true, status: 'approved' };
+  // Show approved and pending pharmacies to public (pending = newly registered)
+  const query = { isActive: true, status: { $in: ['approved', 'pending'] } };
 
   if (city) query['address.city'] = { $regex: city, $options: 'i' };
   if (is24Hours !== undefined) query['operatingHours.is24Hours'] = is24Hours === 'true';
@@ -56,7 +57,7 @@ export const getAllPharmacies = asyncHandler(async (req, res) => {
     const maxDistanceMeters = parseFloat(radius) * 1000; // convert km to meters
 
     // Build match stage for additional filters
-    const matchStage = { isActive: true, status: 'approved' };
+    const matchStage = { isActive: true, status: { $in: ['approved', 'pending'] } };
     if (city) matchStage['address.city'] = { $regex: city, $options: 'i' };
     if (is24Hours !== undefined) matchStage['operatingHours.is24Hours'] = is24Hours === 'true';
     if (search) {
@@ -113,24 +114,32 @@ export const getAllPharmacies = asyncHandler(async (req, res) => {
     }));
     total = result.totalCount[0]?.count || 0;
 
-    // If some approved pharmacies do not have a GeoJSON location yet,
-    // include a few of them to avoid hiding newly created entries.
-    if (pharmacies.length < parseInt(limit, 10)) {
-      const missingLocationQuery = {
-        ...matchStage,
-        'address.location': { $exists: false }
+    // If geo results are fewer than requested limit, append newly added pharmacies
+    // This ensures new pharmacies without proper geo data are still visible
+    if (pharmacies.length < parseInt(limit)) {
+      const existingIds = pharmacies.map(p => p._id.toString());
+      const fallbackQuery = {
+        _id: { $nin: existingIds },
+        isActive: true,
+        status: { $in: ['approved', 'pending'] }
       };
-
-      const missingPharmacies = await Pharmacy.find(missingLocationQuery)
-        .populate('owner', 'name email phone')
-        .sort({ rating: -1 })
-        .limit(parseInt(limit, 10) - pharmacies.length);
-
-      if (missingPharmacies.length > 0) {
-        pharmacies = [...pharmacies, ...missingPharmacies];
-        const missingCount = await Pharmacy.countDocuments(missingLocationQuery);
-        total += missingCount;
+      
+      if (city) fallbackQuery['address.city'] = { $regex: city, $options: 'i' };
+      if (is24Hours !== undefined) fallbackQuery['operatingHours.is24Hours'] = is24Hours === 'true';
+      if (search) {
+        fallbackQuery.$or = [
+          { name: { $regex: search, $options: 'i' } },
+          { 'address.city': { $regex: search, $options: 'i' } }
+        ];
       }
+
+      const fallbackPharmacies = await Pharmacy.find(fallbackQuery)
+        .populate('owner', 'name email phone')
+        .sort({ createdAt: -1 })
+        .limit(Math.min(parseInt(limit, 10), 5));
+
+      pharmacies = [...pharmacies, ...fallbackPharmacies];
+      total += fallbackPharmacies.length;
     }
 
   } else {
@@ -308,9 +317,10 @@ export const verifyPharmacy = asyncHandler(async (req, res) => {
     return sendError(res, 404, 'Pharmacy not found');
   }
 
-  // Notify owner
+  // Reactivate owner account if it exists
   const owner = await User.findById(pharmacy.owner);
   if (owner) {
+    await User.findByIdAndUpdate(owner._id, { isActive: true });
     await Notification.create({
       user: owner._id,
       title: 'Pharmacy approved',
@@ -365,6 +375,10 @@ export const disablePharmacy = asyncHandler(async (req, res) => {
 
   if (!pharmacy) {
     return sendError(res, 404, 'Pharmacy not found');
+  }
+
+  if (pharmacy.owner) {
+    await User.findByIdAndUpdate(pharmacy.owner, { isActive: false, refreshToken: null });
   }
 
   sendSuccess(res, 200, { pharmacy }, 'Pharmacy disabled successfully');

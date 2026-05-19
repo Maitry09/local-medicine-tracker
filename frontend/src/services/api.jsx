@@ -26,11 +26,10 @@ api.interceptors.response.use(
     // If 401 and we haven't tried refreshing yet
     if (error.response?.status === 401 && !originalRequest._retry) {
       
-      if (originalRequest.url?.includes('/auth/refresh-token')) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
+      // Don't try to refresh if it's a login or registration request
+      if (originalRequest.url?.includes('/auth/login') || 
+          originalRequest.url?.includes('/auth/register') ||
+          originalRequest.url?.includes('/auth/refresh-token')) {
         return Promise.reject(error);
       }
       
@@ -164,6 +163,17 @@ export const reviewAPI = {
   getMyReviews: (params) => api.get('/reviews/my-reviews', { params }),
   update: (id, data) => api.put(`/reviews/${id}`, data),
   delete: (id) => api.delete(`/reviews/${id}`)
+};
+
+// Prescription API
+export const prescriptionAPI = {
+  upload: (formData) => api.post('/prescriptions/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  getPharmacyPrescriptions: () => api.get('/prescriptions/pharmacy'),
+  review: (id, data) => api.patch(`/prescriptions/${id}/review`, data),
+  getMyPrescriptions: () => api.get('/prescriptions/my'),
+  getAdminPrescriptions: () => api.get('/prescriptions/admin')
 };
 
 // Order API

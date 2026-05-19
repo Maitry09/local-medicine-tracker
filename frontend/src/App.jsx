@@ -44,6 +44,7 @@ import ManageUsers from './pages/admin/AdminUsers';
 import ManagePharmacies from './pages/admin/AdminPharmacies';
 import ManageMedicines from './pages/admin/AdminMedicines';
 import AdminOrders from './pages/admin/AdminOrders';
+import AdminPrescriptions from './pages/admin/AdminPrescriptions';
 
 // Components
 import ProtectedRoute from './components/ProtectedRoute';
@@ -244,6 +245,10 @@ function App() {
           <Route
             path="/admin/orders"
             element={<AdminOrders />}
+          />
+          <Route
+            path="/admin/prescriptions"
+            element={<AdminPrescriptions />}
           />
         </Route>
       </Route>
