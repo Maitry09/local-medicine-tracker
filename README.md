@@ -1,4 +1,4 @@
-# 🏥 MedFinder - Local Medicine Availability Tracker
+# 🏥 MediFind - Local Medicine Availability Tracker
 
 A full-stack MERN application that helps patients find medicines at nearby pharmacies in real-time. The platform connects patients with local pharmacies, enabling prescription uploads, stock alerts, online ordering, and real-time inventory tracking.
 
