@@ -39,12 +39,6 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 logger.info('🚀 Starting Medicine Tracker Backend...');
 logger.info('📍 Environment:', process.env.NODE_ENV || 'development');
 
-const cors = require("cors");
-
-app.use(cors({
-  origin: "https://medifind.onrender.com",
-  credentials: true
-}));
 
 // Initialize express app
 const app = express();
