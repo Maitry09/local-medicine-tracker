@@ -41,7 +41,7 @@ export const uploadPrescription = asyncHandler(async (req, res) => {
       await Notification.create({
         user: pharmacy.owner._id,
         title: 'New Prescription Uploaded',
-        message: `A patient has uploaded a prescription for review.`,
+        message: 'A patient has uploaded a prescription.',
         type: 'prescription',
         link: `/pharmacy/prescriptions/${prescription._id}`
       });

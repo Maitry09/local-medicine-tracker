@@ -15,6 +15,7 @@ export default function PatientDashboard() {
   const [preview, setPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(null);
+  const [uploadSuggestions, setUploadSuggestions] = useState({ medicines: [], pharmacies: [] });
   const [reminders, setReminders] = useState(() => {
     if (typeof window !== 'undefined') {
       return JSON.parse(localStorage.getItem('medicineReminders') || '[]');
@@ -183,15 +184,18 @@ export default function PatientDashboard() {
 
     setUploading(true);
     setUploadStatus(null);
+    setUploadSuggestions({ medicines: [], pharmacies: [] });
 
     try {
       const formData = new FormData();
       formData.append('prescription', prescriptionFile);
 
-      await api.post('/prescriptions/upload', formData, {
+      const response = await api.post('/prescriptions/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
+      const suggestions = response.data?.data?.suggestions || { medicines: [], pharmacies: [] };
+      setUploadSuggestions(suggestions);
       setUploadStatus({ type: 'success', message: 'Prescription uploaded successfully.' });
       clearPrescriptionForm();
       await fetchDashboardData();
@@ -274,6 +278,18 @@ export default function PatientDashboard() {
         </div>
       </div>
 
+      <div style={{ marginBottom: '30px', display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
+        <div style={{ flex: '1 1 320px', background: '#fff8e1', border: '1px solid #f5e1a4', borderRadius: '8px', padding: '20px' }}>
+          <h3 style={{ marginTop: 0 }}>Prescription Requests</h3>
+          <p style={{ margin: '0 0 12px', color: '#475569' }}>
+            Upload prescriptions and follow pharmacy replies from the dedicated prescription section.
+          </p>
+          <Link to="/patient/prescriptions" className="btn btn-primary btn-sm">
+            View My Prescriptions
+          </Link>
+        </div>
+      </div>
+
       <div style={{ marginBottom: '30px' }}>
         <h2>Prescription Upload</h2>
         <div style={{ padding: '20px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', marginTop: '15px' }}>
@@ -302,6 +318,31 @@ export default function PatientDashboard() {
             {uploadStatus && (
               <div style={{ color: uploadStatus.type === 'error' ? '#b00020' : '#0b6623', background: uploadStatus.type === 'error' ? '#fdecea' : '#e8f5e9', padding: '0.75rem', borderRadius: 6 }}>
                 {uploadStatus.message}
+              </div>
+            )}
+            {(uploadSuggestions?.medicines?.length || uploadSuggestions?.pharmacies?.length) && (
+              <div style={{ marginTop: '1rem', padding: '1rem', background: '#e8f5e9', borderRadius: 8, border: '1px solid #c8e6c9' }}>
+                <h4 style={{ margin: 0, marginBottom: '0.75rem' }}>Suggested medicines & pharmacies</h4>
+                {uploadSuggestions.medicines?.length > 0 && (
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    <strong>Medicines:</strong>
+                    <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
+                      {uploadSuggestions.medicines.map((medicine) => (
+                        <li key={medicine._id}>{medicine.name}{medicine.genericName ? ` (${medicine.genericName})` : ''}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {uploadSuggestions.pharmacies?.length > 0 && (
+                  <div>
+                    <strong>Pharmacies:</strong>
+                    <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
+                      {uploadSuggestions.pharmacies.map((pharmacy) => (
+                        <li key={pharmacy._id}>{pharmacy.name} {pharmacy.address?.city ? `— ${pharmacy.address.city}` : ''}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>

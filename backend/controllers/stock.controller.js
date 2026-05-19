@@ -57,9 +57,46 @@ export const getMyStock = asyncHandler(async (req, res) => {
   );
 });
 
+const createOrFindMedicine = async (medicineId, newMedicine) => {
+  if (medicineId && medicineId !== 'other') {
+    const existing = await Medicine.findById(medicineId);
+    if (existing) return existing;
+  }
+
+  if (!newMedicine || !newMedicine.name) {
+    return null;
+  }
+
+  const normalizedName = newMedicine.name.trim();
+  const normalizedManufacturer = newMedicine.manufacturer?.trim();
+  const searchQuery = {
+    name: { $regex: `^${normalizedName}$`, $options: 'i' }
+  };
+  if (normalizedManufacturer) {
+    searchQuery.manufacturer = { $regex: `^${normalizedManufacturer}$`, $options: 'i' };
+  }
+
+  let medicine = await Medicine.findOne(searchQuery);
+  if (medicine) return medicine;
+
+  medicine = await Medicine.create({
+    name: normalizedName,
+    genericName: newMedicine.genericName?.trim(),
+    manufacturer: normalizedManufacturer || 'Unknown',
+    category: newMedicine.category || 'Other',
+    dosageForm: newMedicine.dosageForm || 'Other',
+    strength: newMedicine.strength?.trim(),
+    prescriptionRequired: Boolean(newMedicine.prescriptionRequired),
+    mrp: Number(newMedicine.mrp) || 0,
+    description: newMedicine.description?.trim()
+  });
+
+  return medicine;
+};
+
 // Add stock item (pharmacy owner)
 export const addStock = asyncHandler(async (req, res) => {
-  const { medicineId, quantity, price, discount, batchNumber, expiryDate } = req.body;
+  const { medicineId, quantity, price, discount, batchNumber, expiryDate, newMedicine } = req.body;
 
   const pharmacy = await resolvePharmacyForUser(req);
   
@@ -67,16 +104,17 @@ export const addStock = asyncHandler(async (req, res) => {
     return sendError(res, 404, 'Pharmacy not found');
   }
 
-  // Check if medicine exists
-  const medicine = await Medicine.findById(medicineId);
+  let medicine = await createOrFindMedicine(medicineId, newMedicine);
   if (!medicine) {
     return sendError(res, 404, 'Medicine not found');
   }
 
+  const effectiveMedicineId = medicine._id;
+
   // Check if stock already exists for this medicine in this pharmacy
   const existingStock = await Stock.findOne({
     pharmacy: pharmacy._id,
-    medicine: medicineId
+    medicine: effectiveMedicineId
   });
 
   if (existingStock) {
@@ -89,12 +127,22 @@ export const addStock = asyncHandler(async (req, res) => {
     await existingStock.save();
     await existingStock.populate('medicine');
 
-    return sendSuccess(res, 200, { stock: existingStock }, 'Stock updated successfully');
+    sendSuccess(res, 200, { stock: existingStock }, 'Stock updated successfully');
+
+    setImmediate(async () => {
+      try {
+        await triggerAvailabilityAlerts(effectiveMedicineId, pharmacy._id, price);
+      } catch (err) {
+        console.error('Error in background alert trigger:', err.message);
+      }
+    });
+
+    return;
   }
 
   const stock = await Stock.create({
     pharmacy: pharmacy._id,
-    medicine: medicineId,
+    medicine: effectiveMedicineId,
     quantity,
     price,
     discount: discount || 0,
@@ -103,17 +151,12 @@ export const addStock = asyncHandler(async (req, res) => {
     isAvailable: quantity > 0
   });
 
-  // Trigger alerts for users waiting for this medicine
   await stock.populate('medicine');
-
-  // FIXED: Send response immediately, then process alerts in background
-  // The pharmacy owner gets instant feedback; alerts run after
   sendSuccess(res, 201, { stock }, 'Stock added successfully');
 
-  // Process alerts asynchronously — runs after response is sent
   setImmediate(async () => {
     try {
-      await triggerAvailabilityAlerts(medicineId, pharmacy._id, price);
+      await triggerAvailabilityAlerts(effectiveMedicineId, pharmacy._id, price);
     } catch (err) {
       console.error('Error in background alert trigger:', err.message);
     }

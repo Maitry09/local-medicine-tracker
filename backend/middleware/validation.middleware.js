@@ -1,4 +1,5 @@
 import { body, param, query, validationResult } from 'express-validator';
+import mongoose from 'mongoose';
 import { sendError } from '../utils/errorHandler.js';
 
 // Middleware to check validation results
@@ -74,9 +75,8 @@ export const medicineValidation = [
     .trim()
     .notEmpty().withMessage('Manufacturer is required'),
   body('category')
-    .notEmpty().withMessage('Category is required')
-    .isIn(['Antibiotics', 'Painkillers', 'Antacids', 'Vitamins', 'Diabetes', 'Blood Pressure', 'Heart', 'Skin', 'Eye Care', 'Respiratory', 'Digestive', 'Mental Health', 'Hormones', 'Allergies', 'Other'])
-    .withMessage('Invalid category'),
+    .trim()
+    .notEmpty().withMessage('Category is required'),
   body('mrp')
     .notEmpty().withMessage('MRP is required')
     .isFloat({ min: 0 }).withMessage('MRP must be a positive number')
@@ -86,7 +86,8 @@ export const medicineValidation = [
 export const stockValidation = [
   body('medicineId')
     .notEmpty().withMessage('Medicine ID is required')
-    .isMongoId().withMessage('Invalid medicine ID'),
+    .custom((value) => value === 'other' || mongoose.Types.ObjectId.isValid(value))
+    .withMessage('Invalid medicine ID'),
   body('quantity')
     .notEmpty().withMessage('Quantity is required')
     .isInt({ min: 0 }).withMessage('Quantity must be a non-negative integer'),
@@ -96,6 +97,27 @@ export const stockValidation = [
   body('expiryDate')
     .notEmpty().withMessage('Expiry date is required')
     .isISO8601().withMessage('Invalid date format')
+];
+
+export const stockUpdateValidation = [
+  body('quantity')
+    .optional()
+    .isInt({ min: 0 }).withMessage('Quantity must be a non-negative integer'),
+  body('price')
+    .optional()
+    .isFloat({ min: 0 }).withMessage('Price must be a positive number'),
+  body('expiryDate')
+    .optional()
+    .isISO8601().withMessage('Invalid date format'),
+  body('discount')
+    .optional()
+    .isFloat({ min: 0 }).withMessage('Discount must be a positive number'),
+  body('isAvailable')
+    .optional()
+    .isBoolean().withMessage('isAvailable must be boolean'),
+  body('batchNumber')
+    .optional()
+    .trim()
 ];
 
 // Order validation rules

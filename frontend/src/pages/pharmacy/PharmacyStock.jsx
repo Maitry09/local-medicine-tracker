@@ -5,6 +5,7 @@ import { useNotification } from '../../context/NotificationContext';
 const PharmacyStock = () => {
   const [stocks, setStocks] = useState([]);
   const [medicines, setMedicines] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -20,6 +21,18 @@ const PharmacyStock = () => {
     batchNumber: ''
   });
 
+  const [newMedicineDetails, setNewMedicineDetails] = useState({
+    name: '',
+    genericName: '',
+    manufacturer: '',
+    category: '',
+    customCategory: '',
+    dosageForm: '',
+    strength: '',
+    prescriptionRequired: false,
+    description: ''
+  });
+
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchData(searchTerm);
@@ -27,6 +40,19 @@ const PharmacyStock = () => {
 
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const res = await medicineAPI.getCategories();
+        setCategories(res.data?.data?.categories || []);
+      } catch (err) {
+        console.error('Failed to load categories', err);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   const fetchData = async (search = '') => {
     try {
@@ -46,18 +72,67 @@ const PharmacyStock = () => {
 
   const handleAddStock = async (e) => {
     e.preventDefault();
+    const isNewMedicine = formData.medicine === 'other';
+
+    if (!formData.expiryDate) {
+      showNotification('Expiry date is required', 'error');
+      return;
+    }
+
+    if (isNewMedicine) {
+      const categoryValue = newMedicineDetails.category === 'Other'
+        ? newMedicineDetails.customCategory.trim()
+        : newMedicineDetails.category.trim();
+
+      if (!newMedicineDetails.name.trim() || !newMedicineDetails.manufacturer.trim() || !categoryValue) {
+        showNotification('Please fill in name, manufacturer, and category for the new medicine.', 'error');
+        return;
+      }
+    }
+
     try {
-      await stockAPI.addStock({
-        medicineId: formData.medicine,
+      const categoryValue = newMedicineDetails.category === 'Other'
+        ? newMedicineDetails.customCategory.trim()
+        : newMedicineDetails.category.trim();
+
+      const stockPayload = {
+        medicineId: isNewMedicine ? 'other' : formData.medicine,
         quantity: Number(formData.quantity),
         price: Number(formData.price),
         discount: 0,
         batchNumber: formData.batchNumber,
-        expiryDate: formData.expiryDate || undefined
-      });
+        expiryDate: formData.expiryDate
+      };
+
+      if (isNewMedicine) {
+        stockPayload.newMedicine = {
+          name: newMedicineDetails.name.trim(),
+          genericName: newMedicineDetails.genericName.trim(),
+          manufacturer: newMedicineDetails.manufacturer.trim(),
+          category: categoryValue || 'Other',
+          dosageForm: newMedicineDetails.dosageForm.trim(),
+          strength: newMedicineDetails.strength.trim(),
+          mrp: Number(formData.price),
+          prescriptionRequired: Boolean(newMedicineDetails.prescriptionRequired),
+          description: newMedicineDetails.description.trim()
+        };
+      }
+
+      await stockAPI.addStock(stockPayload);
       showNotification('Stock added successfully', 'success');
       setShowAddModal(false);
       resetForm();
+      setNewMedicineDetails({
+        name: '',
+        genericName: '',
+        manufacturer: '',
+        category: '',
+        customCategory: '',
+        dosageForm: '',
+        strength: '',
+        prescriptionRequired: false,
+        description: ''
+      });
       await fetchData(searchTerm);
     } catch (error) {
       showNotification(error.response?.data?.message || 'Failed to add stock', 'error');
@@ -108,6 +183,18 @@ const PharmacyStock = () => {
       price: '',
       expiryDate: '',
       batchNumber: ''
+    });
+    setNewMedicineDetails({
+      name: '',
+      genericName: '',
+      manufacturer: '',
+      category: '',
+      customCategory: '',
+      dosageForm: '',
+      strength: '',
+      mrp: '',
+      prescriptionRequired: false,
+      description: ''
     });
   };
 
@@ -234,9 +321,105 @@ const PharmacyStock = () => {
                       {med.name} - {med.manufacturer}
                     </option>
                   ))}
+                  <option value="other">Other (add new medicine)</option>
                 </select>
               </div>
-              {selectedStockItem && (
+
+              {formData.medicine === 'other' ? (
+                <div className="new-medicine-section">
+                  <h4>New Medicine Details</h4>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Name</label>
+                      <input
+                        type="text"
+                        value={newMedicineDetails.name}
+                        onChange={(e) => setNewMedicineDetails({ ...newMedicineDetails, name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Generic Name</label>
+                      <input
+                        type="text"
+                        value={newMedicineDetails.genericName}
+                        onChange={(e) => setNewMedicineDetails({ ...newMedicineDetails, genericName: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Manufacturer</label>
+                      <input
+                        type="text"
+                        value={newMedicineDetails.manufacturer}
+                        onChange={(e) => setNewMedicineDetails({ ...newMedicineDetails, manufacturer: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Category</label>
+                      <select
+                        value={newMedicineDetails.category}
+                        onChange={(e) => setNewMedicineDetails({ ...newMedicineDetails, category: e.target.value, customCategory: '' })}
+                        required
+                      >
+                        <option value="">Select Category</option>
+                        {categories.map((cat) => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                        <option value="Other">Other</option>
+                      </select>
+                      {newMedicineDetails.category === 'Other' && (
+                        <input
+                          type="text"
+                          placeholder="Enter custom category"
+                          value={newMedicineDetails.customCategory}
+                          onChange={(e) => setNewMedicineDetails({ ...newMedicineDetails, customCategory: e.target.value })}
+                          required
+                        />
+                      )}
+                    </div>
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Dosage Form</label>
+                      <input
+                        type="text"
+                        value={newMedicineDetails.dosageForm}
+                        onChange={(e) => setNewMedicineDetails({ ...newMedicineDetails, dosageForm: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Strength</label>
+                      <input
+                        type="text"
+                        value={newMedicineDetails.strength}
+                        onChange={(e) => setNewMedicineDetails({ ...newMedicineDetails, strength: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group checkbox-group">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={newMedicineDetails.prescriptionRequired}
+                          onChange={(e) => setNewMedicineDetails({ ...newMedicineDetails, prescriptionRequired: e.target.checked })}
+                        />
+                        Prescription required
+                      </label>
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>Description</label>
+                    <textarea
+                      value={newMedicineDetails.description}
+                      onChange={(e) => setNewMedicineDetails({ ...newMedicineDetails, description: e.target.value })}
+                    />
+                  </div>
+                </div>
+              ) : selectedStockItem && (
                 <div className="form-group current-stock-info">
                   <label>Current stock</label>
                   <div>{selectedStockItem.quantity ?? 0} units</div>

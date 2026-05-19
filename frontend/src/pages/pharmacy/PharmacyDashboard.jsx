@@ -176,7 +176,7 @@ const PharmacyDashboard = () => {
               <div className="actions-grid">
                 <Link to="/pharmacy/stock" className="action-card">Manage Stock</Link>
                 <Link to="/pharmacy/orders" className="action-card">View Orders</Link>
-                <Link to="/pharmacy/profile" className="action-card">Store Profile</Link>
+                <Link to="/pharmacy/prescriptions" className="action-card">Prescription Requests</Link>
                 <Link to="/pharmacy/analytics" className="action-card">Analytics</Link>
               </div>
             </div>

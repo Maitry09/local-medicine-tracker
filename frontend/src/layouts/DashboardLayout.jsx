@@ -14,6 +14,7 @@ const DashboardLayout = () => {
   const patientLinks = [
     { path: '/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/orders', label: 'My Orders', icon: '📦' },
+    { path: '/patient/prescriptions', label: 'My Prescriptions', icon: '📋' },
     { path: '/alerts', label: 'My Alerts', icon: '🔔' },
     { path: '/search', label: 'Search Medicines', icon: '🔍' },
     { path: '/my-reviews', label: 'My Reviews', icon: '✍️' }
@@ -24,6 +25,7 @@ const DashboardLayout = () => {
     { path: '/pharmacy/analytics', label: 'Analytics', icon: '📈' },
     { path: '/pharmacy/stock', label: 'Manage Stock', icon: '💊' },
     { path: '/pharmacy/orders', label: 'Orders', icon: '📦' },
+    { path: '/pharmacy/prescriptions', label: 'Prescription Requests', icon: '📋' },
     { path: '/pharmacy/profile', label: 'Pharmacy Profile', icon: '🏪' },
     { path: '/pharmacy/settings', label: 'Settings', icon: '⚙️' }
   ];

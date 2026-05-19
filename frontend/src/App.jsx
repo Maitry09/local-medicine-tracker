@@ -23,6 +23,7 @@ import ResetPassword from './pages/auth/ResetPassword';
 // Patient Pages
 import PatientDashboard from './pages/patient/Dashboard';
 import PrescriptionUpload from './pages/patient/PrescriptionUpload';
+import MyPrescriptions from './pages/patient/MyPrescriptions';
 import MyOrders from './pages/patient/MyOrders';
 import MyReviews from './pages/patient/MyReviews';
 import OrderDetails from './pages/patient/OrderDetails';
@@ -45,6 +46,7 @@ import ManagePharmacies from './pages/admin/AdminPharmacies';
 import ManageMedicines from './pages/admin/AdminMedicines';
 import AdminOrders from './pages/admin/AdminOrders';
 import AdminPrescriptions from './pages/admin/AdminPrescriptions';
+import PrescriptionReview from './pages/pharmacy/PrescriptionReview';
 
 // Components
 import ProtectedRoute from './components/ProtectedRoute';
@@ -178,6 +180,10 @@ function App() {
             path="/patient/prescription-upload/:id?"
             element={<PrescriptionUpload />}
           />
+          <Route
+            path="/patient/prescriptions"
+            element={<MyPrescriptions />}
+          />
         </Route>
       </Route>
 
@@ -209,6 +215,10 @@ function App() {
           <Route
             path="/pharmacy/profile"
             element={<PharmacyProfile />}
+          />
+          <Route
+            path="/pharmacy/prescriptions"
+            element={<PrescriptionReview />}
           />
           <Route
             path="/pharmacy/settings"

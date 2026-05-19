@@ -74,34 +74,48 @@ const AdminPrescriptions = () => {
               <tr>
                 <th>Prescription</th>
                 <th>Patient</th>
-                <th>Order</th>
-                <th>Status</th>
+                <th>Pharmacy Responses</th>
                 <th>Uploaded</th>
               </tr>
             </thead>
             <tbody>
-              {filteredPrescriptions.map((prescription) => (
-                <tr key={prescription._id}>
-                  <td>
-                    <a
-                      href={getImageUrl(prescription.imageUrl)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="link"
-                    >
-                      View image
-                    </a>
-                  </td>
-                  <td>{prescription.patient?.name || prescription.patient?.email || 'Unknown'}</td>
-                  <td>{prescription.order ? `#${prescription.order.orderNumber?.slice(-8).toUpperCase()}` : 'No order'}</td>
-                  <td>
-                    <span className={`badge ${prescription.status === 'approved' ? 'badge-success' : prescription.status === 'rejected' ? 'badge-danger' : 'badge-warning'}`}>
-                      {prescription.status}
-                    </span>
-                  </td>
-                  <td>{new Date(prescription.createdAt).toLocaleString()}</td>
-                </tr>
-              ))}
+              {filteredPrescriptions.map((prescription) => {
+                const pharmacyNames = prescription.responses?.map((response) => response.pharmacy?.name || response.pharmacyName).filter(Boolean);
+                const responseSummaries = prescription.responses?.map((response) => `${response.pharmacy?.name || response.pharmacyName}: ${response.status || 'submitted'}`).filter(Boolean).join(', ');
+                const latestResponse = prescription.responses?.length ? prescription.responses[prescription.responses.length - 1] : null;
+                return (
+                  <tr key={prescription._id}>
+                    <td>
+                      <a
+                        href={getImageUrl(prescription.imageUrl)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="link"
+                      >
+                        View image
+                      </a>
+                    </td>
+                    <td>{prescription.patient?.name || prescription.patient?.email || 'Unknown'}</td>
+                    <td>
+                      {responseSummaries ? (
+                        <div>
+                          <div>{responseSummaries}</div>
+                          {latestResponse?.message && (
+                            <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
+                              {latestResponse.message.length > 60
+                                ? `${latestResponse.message.slice(0, 60)}...`
+                                : latestResponse.message}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted">No replies yet</span>
+                      )}
+                    </td>
+                    <td>{new Date(prescription.createdAt).toLocaleString()}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

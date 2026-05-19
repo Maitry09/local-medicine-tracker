@@ -1,6 +1,7 @@
 import Alert from '../models/Alert.js';
 import Medicine from '../models/Medicine.js';
 import Pharmacy from '../models/Pharmacy.js';
+import Stock from '../models/Stock.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
 
 // Get my alerts
@@ -28,10 +29,19 @@ export const getMyAlerts = asyncHandler(async (req, res) => {
     .skip((page - 1) * limit)
     .sort({ createdAt: -1 });
 
+  const enrichedAlerts = await Promise.all(alerts.map(async (alert) => {
+    const availableAt = await getAvailablePharmaciesForAlert(alert);
+    return {
+      ...alert.toObject(),
+      isTriggered: alert.isTriggered || availableAt.length > 0,
+      availableAt
+    };
+  }));
+
   const total = await Alert.countDocuments(query);
 
   sendSuccess(res, 200, {
-    alerts,
+    alerts: enrichedAlerts,
     pagination: {
       current: parseInt(page),
       pages: Math.ceil(total / limit),
@@ -39,6 +49,34 @@ export const getMyAlerts = asyncHandler(async (req, res) => {
     }
   }, 'Alerts fetched successfully');
 });
+
+const getAvailablePharmaciesForAlert = async (alert) => {
+  const query = {
+    medicine: alert.medicine,
+    quantity: { $gt: 0 },
+    isAvailable: true
+  };
+
+  if (alert.pharmacy) {
+    query.pharmacy = alert.pharmacy;
+  }
+
+  const stocks = await Stock.find(query)
+    .populate('pharmacy', 'name address phone')
+    .limit(5);
+
+  return stocks
+    .filter((stock) => stock.pharmacy)
+    .map((stock) => ({
+      _id: stock.pharmacy._id,
+      name: stock.pharmacy.name,
+      address: stock.pharmacy.address,
+      phone: stock.pharmacy.phone,
+      quantity: stock.quantity,
+      price: stock.price,
+      discount: stock.discount
+    }));
+};
 
 // Create alert
 export const createAlert = asyncHandler(async (req, res) => {
@@ -80,10 +118,17 @@ export const createAlert = asyncHandler(async (req, res) => {
     notificationMethod: notificationMethod || 'email'
   });
 
+  const availableAt = await getAvailablePharmaciesForAlert(alert);
+  if (availableAt.length > 0) {
+    alert.isTriggered = true;
+    alert.triggeredAt = new Date();
+    await alert.save();
+  }
+
   await alert.populate('medicine', 'name genericName manufacturer mrp');
   await alert.populate('pharmacy', 'name address');
 
-  sendSuccess(res, 201, { alert }, 'Alert created successfully');
+  sendSuccess(res, 201, { alert: { ...alert.toObject(), availableAt } }, 'Alert created successfully');
 });
 
 // Update alert

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { pharmacyAPI, reviewAPI } from '../services/api';
+import { pharmacyAPI, reviewAPI, alertAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useNotification } from '../context/NotificationContext';
@@ -37,7 +37,7 @@ const PharmacyDetails = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToCart } = useCart();
-  const { success } = useNotification();
+  const { success, showNotification } = useNotification();
 
   const [pharmacy, setPharmacy] = useState(null);
   const [stock, setStock] = useState([]);
@@ -66,7 +66,7 @@ const PharmacyDetails = () => {
     try {
       const [pharmacyRes, stockRes] = await Promise.all([
         pharmacyAPI.getById(id),
-        pharmacyAPI.getStock(id, { inStock: 'true', limit: 100 })
+        pharmacyAPI.getStock(id, { limit: 100 })
       ]);
       setPharmacy(pharmacyRes.data.data.pharmacy);
       setStock(stockRes.data.data.stock);
@@ -187,6 +187,24 @@ const PharmacyDetails = () => {
 
     if (added) {
       success(`${stockItem.medicine.name} added to cart`);
+    }
+  };
+
+  const handleSetAlert = async (stockItem) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      await alertAPI.create({
+        medicineId: stockItem.medicine._id,
+        pharmacyId: pharmacy._id,
+        type: 'availability'
+      });
+      showNotification(`Alert created for ${stockItem.medicine.name}`, 'success');
+    } catch (error) {
+      showNotification(error.response?.data?.message || 'Failed to create alert', 'error');
     }
   };
 
@@ -401,9 +419,11 @@ const PharmacyDetails = () => {
               <div className="card-body">
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                   <span className="badge badge-primary">{item.medicine.category}</span>
-                  {item.quantity < 10 && (
+                  {item.quantity === 0 ? (
+                    <span className="badge badge-danger">Out of Stock</span>
+                  ) : item.quantity < 10 ? (
                     <span className="badge badge-warning">Low Stock</span>
-                  )}
+                  ) : null}
                 </div>
                 <Link to={`/medicines/${item.medicine._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                   <h4 className="medicine-name">{item.medicine.name}</h4>
@@ -421,15 +441,24 @@ const PharmacyDetails = () => {
                       <span className="medicine-mrp">Rs. {item.price}</span>
                     )}
                   </div>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => handleAddToCart(item)}
-                  >
-                    Add
-                  </button>
+                  {item.quantity > 0 ? (
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => handleAddToCart(item)}
+                    >
+                      Add
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-outline btn-sm"
+                      onClick={() => handleSetAlert(item)}
+                    >
+                      Set Alert
+                    </button>
+                  )}
                 </div>
                 <p className="text-xs text-muted mt-2">
-                  {item.quantity} units available
+                  {item.quantity === 0 ? 'Out of stock — set an alert to be notified when available' : `${item.quantity} units available`}
                 </p>
               </div>
             </div>

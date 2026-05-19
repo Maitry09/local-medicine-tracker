@@ -20,23 +20,7 @@ const medicineSchema = new mongoose.Schema({
   category: {
     type: String,
     required: [true, 'Category is required'],
-    enum: [
-      'Antibiotics',
-      'Painkillers',
-      'Antacids',
-      'Vitamins',
-      'Diabetes',
-      'Blood Pressure',
-      'Heart',
-      'Skin',
-      'Eye Care',
-      'Respiratory',
-      'Digestive',
-      'Mental Health',
-      'Hormones',
-      'Allergies',
-      'Other'
-    ]
+    trim: true
   },
   description: {
     type: String,

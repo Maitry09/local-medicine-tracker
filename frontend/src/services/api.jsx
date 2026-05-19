@@ -171,9 +171,11 @@ export const prescriptionAPI = {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   getPharmacyPrescriptions: () => api.get('/prescriptions/pharmacy'),
+  respond: (id, data) => api.post(`/prescriptions/${id}/respond`, data),
   review: (id, data) => api.patch(`/prescriptions/${id}/review`, data),
   getMyPrescriptions: () => api.get('/prescriptions/my'),
-  getAdminPrescriptions: () => api.get('/prescriptions/admin')
+  getAdminPrescriptions: () => api.get('/prescriptions/admin'),
+  getById: (id) => api.get(`/prescriptions/${id}`)
 };
 
 // Order API

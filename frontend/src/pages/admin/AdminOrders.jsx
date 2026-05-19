@@ -237,14 +237,34 @@ const AdminOrders = () => {
 
               <section>
                 <h3>Order Items</h3>
-                <div className="order-items-list">
-                  {selectedOrder.items?.map((item, index) => (
-                    <div key={index} className="order-item">
-                      <span className="item-name">{item.medicine?.name}</span>
-                      <span className="item-qty">x{item.quantity}</span>
-                      <span className="item-price">Rs. {(item.price * item.quantity).toFixed(2)}</span>
-                    </div>
-                  ))}
+                <div className="order-items-table" style={{ overflowX: 'auto', marginTop: 12 }}>
+                  <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left', padding: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>Medicine</th>
+                        <th style={{ textAlign: 'left', padding: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>Strength / Form</th>
+                        <th style={{ textAlign: 'right', padding: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>Qty</th>
+                        <th style={{ textAlign: 'right', padding: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>Unit Price</th>
+                        <th style={{ textAlign: 'right', padding: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedOrder.items?.map((item, index) => (
+                        <tr key={index}>
+                          <td style={{ padding: '0.75rem', borderBottom: '1px solid #f3f4f6' }}>
+                            <div style={{ fontWeight: 600 }}>{item.medicine?.name}</div>
+                            <div style={{ fontSize: 12, color: '#6b7280' }}>{item.medicine?.genericName || item.medicine?.manufacturer}</div>
+                          </td>
+                          <td style={{ padding: '0.75rem', borderBottom: '1px solid #f3f4f6' }}>
+                            {item.medicine?.strength || item.medicine?.dosageForm || '-'}
+                          </td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #f3f4f6' }}>x{item.quantity}</td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #f3f4f6' }}>Rs. {Number(item.price).toFixed(2)}</td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #f3f4f6' }}>Rs. {(item.price * item.quantity).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </section>
 
