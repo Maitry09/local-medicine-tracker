@@ -314,3 +314,40 @@
   font-weight: 600;
   margin-left: 10px;
 }
+@media (max-width: 992px) {
+  .cart-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .cart-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-card {
+    position: static;
+    width: 100%;
+    top: auto;
+  }
+
+  .cart-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 576px) {
+  .cart-header h1 {
+    font-size: 1.75rem;
+  }
+
+  .qty-wrapper {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .remove-btn {
+    width: 100%;
+  }
+}

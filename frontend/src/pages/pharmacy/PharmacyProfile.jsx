@@ -174,6 +174,7 @@ const PharmacyProfile = () => {
               <input
                 type="email"
                 value={formData.email}
+                autoComplete="email"
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               />
             </div>

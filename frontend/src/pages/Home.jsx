@@ -48,27 +48,40 @@ const Home = () => {
   return (
     <div>
       {/* Hero Section */}
-      <section className="hero">
+      <section className="hero hero-home">
         <div className="container">
           <h1 className="hero-title">Find Medicines Near You</h1>
           <p className="hero-subtitle">
             Check real-time availability of medicines at nearby pharmacies
           </p>
           
-          <form onSubmit={handleSearch} className="search-box" style={{ marginTop: '2rem' }}>
+          <form
+            onSubmit={handleSearch}
+            className="search-box"
+            style={{
+              marginTop: '2rem',
+              maxWidth: 760,
+              marginLeft: 'auto',
+              marginRight: 'auto',
+              display: 'flex',
+              gap: '0.75rem',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
             <input
               type="text"
               className="form-input"
-              placeholder="Search for medicines..."
+              placeholder="Search for medicines, brands, or symptoms..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ fontSize: '1.125rem', padding: '1rem' }}
+              style={{ fontSize: '1.125rem', padding: '1rem', flex: '1 1 320px' }}
             />
-            <button type="submit" className="btn btn-secondary btn-lg">
+            <button type="submit" className="btn btn-secondary btn-lg" style={{ flex: '0 0 auto' }}>
               Search
             </button>
           </form>
-
           <p style={{ marginTop: '1rem', opacity: 0.8 }}>
             Popular: Paracetamol, Amoxicillin, Vitamin D3, Omeprazole
           </p>

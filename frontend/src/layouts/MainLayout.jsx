@@ -1,13 +1,18 @@
+import { useState } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useNotification } from '../context/NotificationContext';
 
 const MainLayout = () => {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { user, logout } = useAuth();
   const { getItemCount } = useCart();
   const { showNotification } = useNotification();
   const navigate = useNavigate();
+
+  const closeMenu = () => setMobileNavOpen(false);
+  const toggleMenu = () => setMobileNavOpen((prev) => !prev);
 
   const handleLogout = async () => {
     try {
@@ -37,20 +42,31 @@ const MainLayout = () => {
     <div className="app">
       <header className="header">
         <div className="header-content">
-          <Link to="/" className="logo">
+          <Link to="/" className="logo" onClick={closeMenu}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>
             </svg>
             MediFind
           </Link>
 
-          <nav className="nav">
+          <button
+            type="button"
+            className="nav-toggle"
+            aria-controls="primary-navigation"
+            aria-expanded={mobileNavOpen}
+            aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            onClick={toggleMenu}
+          >
+            {mobileNavOpen ? '✕' : '☰'}
+          </button>
+
+          <nav id="primary-navigation" className={`nav ${mobileNavOpen ? 'nav-open' : ''}`}>
             <Link to="/search" className="nav-link">Search Medicines</Link>
             <Link to="/pharmacies" className="nav-link">Pharmacies</Link>
             
             {user ? (
               <>
-                <Link to="/cart" className="nav-link" style={{ position: 'relative' }}>
+                <Link to="/cart" className="nav-link" style={{ position: 'relative' }} onClick={closeMenu}>
                   Cart
                   {getItemCount() > 0 && (
                     <span style={{
@@ -71,15 +87,21 @@ const MainLayout = () => {
                     </span>
                   )}
                 </Link>
-                <Link to={getDashboardLink()} className="nav-link">Dashboard</Link>
-                <button onClick={handleLogout} className="btn btn-outline btn-sm">
+                <Link to={getDashboardLink()} className="nav-link" onClick={closeMenu}>Dashboard</Link>
+                <button
+                  onClick={async () => {
+                    closeMenu();
+                    await handleLogout();
+                  }}
+                  className="btn btn-outline btn-sm"
+                >
                   Logout
                 </button>
               </>
             ) : (
               <>
-                <Link to="/login" className="btn btn-outline btn-sm">Login</Link>
-                <Link to="/register" className="btn btn-primary btn-sm">Register</Link>
+                <Link to="/login" className="btn btn-outline btn-sm" onClick={closeMenu}>Login</Link>
+                <Link to="/register" className="btn btn-primary btn-sm" onClick={closeMenu}>Register</Link>
               </>
             )}
           </nav>

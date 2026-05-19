@@ -157,6 +157,7 @@ const Register = () => {
             value={formData.email}
             onChange={handleChange}
             placeholder="Enter your email"
+            autoComplete="email"
             className={`form-input ${errors.email ? 'input-error' : ''}`}
             required
           />

@@ -451,3 +451,21 @@
     max-width: 90vw;
   }
 }
+
+@media (max-width: 576px) {
+  .settings-card,
+  .preview-box,
+  .info-card,
+  .modal-content {
+    padding: 1rem;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  .btn-primary,
+  .btn-outline {
+    width: 100%;
+  }
+}

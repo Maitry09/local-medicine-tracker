@@ -455,6 +455,50 @@
   font-size: 0.85rem;
 }
 
+@media (max-width: 992px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .order-status-section,
+  .detail-card {
+    padding: 1.25rem;
+  }
+
+  .order-content {
+    grid-template-columns: 1fr;
+  }
+
+  .order-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .item-pricing {
+    text-align: left;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 576px) {
+  .page-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .order-status-section,
+  .detail-card {
+    padding: 1rem;
+  }
+
+  .btn,
+  .btn-primary,
+  .btn-outline {
+    width: 100%;
+  }
+}
+
 /* Review Modal */
 .modal-overlay {
   position: fixed;

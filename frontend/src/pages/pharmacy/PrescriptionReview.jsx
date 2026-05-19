@@ -557,203 +557,135 @@ export default function PrescriptionReview() {
                       )}
 
                       {/* Expanded Section */}
-                      {expandedPrescriptionId ===
-                        p._id && (
-                        <div
-                          style={{
-                            marginTop:
-                              '1rem'
-                          }}
-                        >
-                          <h4>
-                            Current
-                            Pharmacy
-                            Stock
-                          </h4>
-
-                          {hasFinalResponse ? (
-                            <div
-                              style={{
-                                marginTop:
-                                  '1rem',
-                                padding:
-                                  '1rem',
-                                borderRadius: 10,
-                                background:
-                                  '#f8fafc'
-                              }}
-                            >
-                              Already
-                              responded.
+                      {expandedPrescriptionId === p._id && (
+                        <div style={{ marginTop: '1rem' }}>
+                          <div className="card" style={{ background: '#f8fafc', padding: '1rem', border: '1px solid #e2e8f0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+                              <div>
+                                <h4 style={{ margin: 0 }}>Suggested response</h4>
+                                <p className="text-muted" style={{ margin: '0.5rem 0 0' }}>
+                                  Choose medicines from your stock, add notes, and send a response to the patient.
+                                </p>
+                              </div>
+                              <div style={{ fontSize: 14, color: '#475569' }}>
+                                {stockItems.length} medicines available
+                              </div>
                             </div>
-                          ) : (
-                            <>
-                              <div
-                                style={{
-                                  display:
-                                    'grid',
-                                  gap:
-                                    '0.5rem'
-                                }}
-                              >
-                                {stockItems.map(
-                                  (
-                                    item
-                                  ) => (
-                                    <label
-                                      key={
-                                        item._id
-                                      }
-                                      style={{
-                                        display:
-                                          'flex',
-                                        gap:
-                                          '1rem',
-                                        padding:
-                                          '0.75rem',
-                                        border:
-                                          '1px solid #eee',
-                                        borderRadius: 8
-                                      }}
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={selectedSuggestions.includes(
-                                          item._id
-                                        )}
-                                        onChange={() =>
-                                          toggleSuggestion(
-                                            item._id
-                                          )
-                                        }
-                                      />
 
-                                      <div
-                                        style={{
-                                          flex: 1
-                                        }}
-                                      >
-                                        <div
-                                          style={{
-                                            fontWeight: 600
-                                          }}
-                                        >
-                                          {
-                                            item
-                                              .medicine
-                                              ?.name
-                                          }
-                                        </div>
-
-                                        <div
-                                          style={{
-                                            fontSize: 12
-                                          }}
-                                        >
-                                          {
-                                            item.quantity
-                                          }{' '}
-                                          units
-                                        </div>
-
-                                        {selectedSuggestions.includes(
-                                          item._id
-                                        ) && (
-                                          <input
-                                            type="text"
-                                            placeholder="Note"
-                                            value={
-                                              suggestionNotes[
-                                                item
-                                                  ._id
-                                              ] ||
-                                              ''
-                                            }
-                                            onChange={(
-                                              e
-                                            ) =>
-                                              handleNoteChange(
-                                                item._id,
-                                                e
-                                                  .target
-                                                  .value
-                                              )
-                                            }
-                                          />
-                                        )}
-                                      </div>
-                                    </label>
-                                  )
+                            {hasFinalResponse ? (
+                              <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: 10, background: '#eef2ff' }}>
+                                <strong>Response already submitted</strong>
+                                {myResponse?.message && (
+                                  <p style={{ margin: '0.75rem 0 0', lineHeight: 1.6 }}>
+                                    <strong>Message:</strong> {myResponse.message}
+                                  </p>
+                                )}
+                                {myResponse?.pricingDetails && (
+                                  <p style={{ margin: '0.5rem 0 0', lineHeight: 1.6 }}>
+                                    <strong>Pricing:</strong> {myResponse.pricingDetails}
+                                  </p>
                                 )}
                               </div>
+                            ) : (
+                              <>
+                                <div style={{ marginTop: '1rem', display: 'grid', gap: '0.75rem' }}>
+                                  {stockItems.map((item) => (
+                                    <div
+                                      key={item._id}
+                                      className="card"
+                                      style={{
+                                        padding: '0.9rem',
+                                        borderColor: selectedSuggestions.includes(item._id) ? '#2563eb' : '#e2e8f0',
+                                        borderWidth: 1,
+                                        borderStyle: 'solid',
+                                        boxShadow: '0 1px 2px rgba(15,23,42,0.04)'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
+                                          <input
+                                            type="checkbox"
+                                            checked={selectedSuggestions.includes(item._id)}
+                                            onChange={() => toggleSuggestion(item._id)}
+                                          />
+                                          <div style={{ minWidth: 0, flex: 1 }}>
+                                            <div style={{ fontWeight: 600, fontSize: '0.98rem' }}>
+                                              {item.medicine?.name || item.medicine?.genericName || 'Medicine'}
+                                            </div>
+                                            <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                                              {item.quantity} units available • ₹{item.price?.toFixed?.(2) ?? item.price}
+                                            </div>
+                                          </div>
+                                        </label>
+                                      </div>
 
-                              <textarea
-                                rows={3}
-                                value={
-                                  responseMessage
-                                }
-                                onChange={(
-                                  e
-                                ) =>
-                                  setResponseMessage(
-                                    e.target
-                                      .value
-                                  )
-                                }
-                                placeholder="Response message"
-                                style={{
-                                  width:
-                                    '100%',
-                                  padding:
-                                    '0.75rem',
-                                  marginTop:
-                                    '1rem'
-                                }}
-                              />
+                                      {selectedSuggestions.includes(item._id) && (
+                                        <div style={{ marginTop: '0.75rem' }}>
+                                          <label className="form-label" style={{ marginBottom: '0.35rem' }}>
+                                            Suggestion note
+                                          </label>
+                                          <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Optional note for this medicine"
+                                            value={suggestionNotes[item._id] || ''}
+                                            onChange={(e) => handleNoteChange(item._id, e.target.value)}
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
 
-                              <input
-                                type="text"
-                                value={
-                                  responsePricing
-                                }
-                                onChange={(
-                                  e
-                                ) =>
-                                  setResponsePricing(
-                                    e.target
-                                      .value
-                                  )
-                                }
-                                placeholder="Pricing details"
-                                style={{
-                                  width:
-                                    '100%',
-                                  padding:
-                                    '0.75rem',
-                                  marginTop:
-                                    '1rem'
-                                }}
-                              />
+                                <div className="card" style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #e2e8f0' }}>
+                                  <div style={{ display: 'grid', gap: '1rem' }}>
+                                    <div>
+                                      <label className="form-label">Response status</label>
+                                      <select
+                                        className="form-select"
+                                        value={responseStatus}
+                                        onChange={(e) => setResponseStatus(e.target.value)}
+                                      >
+                                        <option value="approved">Approve prescription</option>
+                                        <option value="rejected">Reject prescription</option>
+                                        <option value="pending">Ask for clarification</option>
+                                      </select>
+                                    </div>
 
-                              <button
-                                className="btn btn-primary"
-                                style={{
-                                  marginTop:
-                                    '1rem'
-                                }}
-                                onClick={() =>
-                                  handleResponseSubmit(
-                                    p._id
-                                  )
-                                }
-                              >
-                                {submittingResponseId ===
-                                p._id
-                                  ? 'Sending...'
-                                  : 'Send Response'}
-                              </button>
-                            </>
-                          )}
+                                    <div>
+                                      <label className="form-label">Response message</label>
+                                      <textarea
+                                        rows={4}
+                                        className="form-textarea"
+                                        value={responseMessage}
+                                        onChange={(e) => setResponseMessage(e.target.value)}
+                                        placeholder="Write a short message for the patient..."
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <label className="form-label">Pricing details</label>
+                                      <input
+                                        type="text"
+                                        className="form-input"
+                                        value={responsePricing}
+                                        onChange={(e) => setResponsePricing(e.target.value)}
+                                        placeholder="Example: 6 tablets @ ₹12 each, total ₹72"
+                                      />
+                                    </div>
+
+                                    <button
+                                      className="btn btn-primary"
+                                      onClick={() => handleResponseSubmit(p._id)}
+                                      disabled={submittingResponseId === p._id}
+                                    >
+                                      {submittingResponseId === p._id ? 'Sending...' : 'Send Response'}
+                                    </button>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>

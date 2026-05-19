@@ -67,7 +67,7 @@ const Login = () => {
         <div className="form-group">
           <label htmlFor="email" className="form-label">Email Address</label>
           <input type="email" id="email" name="email" value={formData.email} onChange={handleChange}
-            placeholder="Enter your email" className={`form-input ${errors.email ? 'input-error' : ''}`} required />
+            placeholder="Enter your email" autoComplete="username" className={`form-input ${errors.email ? 'input-error' : ''}`} required />
           {errors.email && <small className="error-text">{errors.email}</small>}
         </div>
 

@@ -164,7 +164,7 @@ const Profile = () => {
             </div>
             <div className="form-group">
               <label>Email Address</label>
-              <input type="email" value={profileData.email} disabled />
+              <input type="email" value={profileData.email} disabled autoComplete="email" />
               <span className="form-hint">Email cannot be changed</span>
             </div>
 
