@@ -7,7 +7,6 @@ A full-stack MERN application that helps patients find medicines at nearby pharm
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Environment Variables](#environment-variables)
 - [Running the Application](#running-the-application)
@@ -156,19 +155,6 @@ medfinder/
 └── README.md                # This file
 ```
 
-## 📋 Prerequisites
-
-Before you begin, ensure you have the following installed:
-
-- **Node.js** (v16 or higher) - [Download](https://nodejs.org/)
-- **MongoDB** (v6 or higher) - [Download](https://www.mongodb.com/try/download/community)
-- **npm** or **pnpm** - Package manager
-- **Git** - Version control
-
-Optional but recommended:
-- **MongoDB Compass** - GUI for MongoDB
-- **Postman** - API testing
-
 ## 🚀 Installation
 
 ### 1. Clone the Repository
@@ -291,27 +277,6 @@ This will create:
 # From root directory
 npm run dev
 ```
-
-#### Option B: Run separately in different terminals
-
-**Terminal 1 - Backend:**
-```bash
-cd backend
-npm run dev
-```
-
-**Terminal 2 - Frontend:**
-```bash
-cd frontend
-npm run dev
-```
-
-The application will be available at:
-- **Frontend:** http://localhost:5173
-- **Backend API:** http://localhost:5000
-- **API Health Check:** http://localhost:5002/api/health
-- **API Documentation:** http://localhost:5002/api-docs
-
 ### Production Mode
 
 #### Build the frontend:
@@ -665,84 +630,20 @@ http://localhost:5000/api
 - **Query Optimization** - Efficient MongoDB aggregation pipelines
 - **Connection Pooling** - Optimized database connections
 
-## 📚 Documentation
-
-- **API Documentation** - Interactive Swagger/OpenAPI docs at `/api-docs`
-- **Code Comments** - Comprehensive inline documentation
-- **README** - Complete setup and usage guide
-- **Environment Template** - `.env.example` with all required variables
-- **Contributing Guide** - Guidelines for contributors
-
-## 🐛 Common Issues & Solutions
-
-### MongoDB Connection Error
-```
-Error: ECONNREFUSED 127.0.0.1:27017
-```
-**Solution:** Make sure MongoDB is running
-```bash
-sudo systemctl start mongod
-# or
-brew services start mongodb-community
-```
-
-### Port Already in Use
-```
-Error: listen EADDRINUSE: address already in use :::5002
-```
-**Solution:** Kill the process using the port
-```bash
-# Find process
-lsof -i :5002
-# Kill process
-kill -9 <PID>
-```
-
-### CORS Error
-**Solution:** Check that `FRONTEND_URL` in `.env` matches your frontend URL
-
-### JWT Secret Missing
-**Solution:** Add `JWT_SECRET` to your `.env` file
-
 ## 📝 Testing
-
-### Run Tests
-
-```bash
-# Run all tests
-npm test
-
-# Run backend tests
-cd backend && npm test
-
-# Run frontend tests
-cd frontend && npm test
-
-# Run tests with coverage
-npm run test:coverage
-
-# Run integration tests
-npm run test:integration
-```
-
-### Test Coverage
-- **Unit Tests:** Controllers, Services, Utilities
-- **Integration Tests:** API endpoints, Database operations
-- **E2E Tests:** Critical user flows
-- **Code Coverage:** Target 80%+
 
 ### Test Database Connection
 ```bash
-curl http://localhost:5002/api/test-db
+curl http://localhost:5000/api/test-db
 ```
 
 ### Test Health Endpoint
 ```bash
-curl http://localhost:5002/api/health
+curl http://localhost:5000/api/health
 ```
 
 ### API Testing with Swagger
-Visit `http://localhost:5002/api-docs` to interactively test all API endpoints.
+Visit `http://localhost:5000/api-docs` to interactively test all API endpoints.
 
 ## 🤝 Contributing
 
@@ -759,14 +660,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 👨‍💻 Author
 
 Maitry Chauhan - maitrychauhan30@gmail.com
-
-## 🙏 Acknowledgments
-
-- MongoDB for the database
-- Express.js team
-- React team
-- Vite team
-- All open-source contributors
 
 ## 📞 Support
 
