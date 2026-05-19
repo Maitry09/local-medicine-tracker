@@ -4,6 +4,7 @@
 // After: const server = app.listen(PORT, ...) → add: initSocket(server);
 
 import { Server } from 'socket.io';
+import logger from '../utils/logger.js';
 
 let io;
 
@@ -31,7 +32,8 @@ export function initSocket(httpServer) {
     });
   });
 
-  console.log('🔌 Socket.io initialized');
+  // Use logger for consistent, environment-aware output
+  logger.info('🔌 Socket.io initialized');
   return io;
 }
 

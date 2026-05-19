@@ -3,6 +3,7 @@ import Medicine from '../models/Medicine.js';
 import Pharmacy from '../models/Pharmacy.js';
 import Alert from '../models/Alert.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
+import logger from '../utils/logger.js';
 
 const resolvePharmacyForUser = async (req) => {
   let pharmacy = await Pharmacy.findOne({ owner: req.userId });
@@ -133,8 +134,8 @@ export const addStock = asyncHandler(async (req, res) => {
       try {
         await triggerAvailabilityAlerts(effectiveMedicineId, pharmacy._id, price);
       } catch (err) {
-        console.error('Error in background alert trigger:', err.message);
-      }
+          logger.error('Error in background alert trigger:', err.message);
+        }
     });
 
     return;
@@ -158,8 +159,8 @@ export const addStock = asyncHandler(async (req, res) => {
     try {
       await triggerAvailabilityAlerts(effectiveMedicineId, pharmacy._id, price);
     } catch (err) {
-      console.error('Error in background alert trigger:', err.message);
-    }
+        logger.error('Error in background alert trigger:', err.message);
+      }
   });
 });
 
@@ -209,8 +210,8 @@ export const updateStock = asyncHandler(async (req, res) => {
       try {
         await triggerPriceDropAlerts(stock.medicine._id, pharmacy._id, price);
       } catch (err) {
-        console.error('Error in background price alert trigger:', err.message);
-      }
+          logger.error('Error in background price alert trigger:', err.message);
+        }
     });
   }
 });
@@ -305,8 +306,8 @@ const triggerAvailabilityAlerts = async (medicineId, pharmacyId, price) => {
       // In production, send notification here
       await alert.save();
     }
-  } catch (error) {
-    console.error('Error triggering availability alerts:', error);
+    } catch (error) {
+    logger.error('Error triggering availability alerts:', error);
   }
 };
 
@@ -327,7 +328,7 @@ const triggerPriceDropAlerts = async (medicineId, pharmacyId, newPrice) => {
       // In production, send notification here
       await alert.save();
     }
-  } catch (error) {
-    console.error('Error triggering price drop alerts:', error);
+    } catch (error) {
+    logger.error('Error triggering price drop alerts:', error);
   }
 };

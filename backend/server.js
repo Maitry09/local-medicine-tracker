@@ -1,5 +1,6 @@
 import logger from './utils/logger.js';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
 import connectDB from './config/database.js';
 import express from 'express';
 import cors from 'cors';
@@ -7,6 +8,14 @@ import mongoose from 'mongoose';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import mongoSanitize from 'express-mongo-sanitize';
+import swaggerUi from 'swagger-ui-express';
+import { url } from 'inspector';
+import cookieParser from 'cookie-parser';
+import csurf from 'csurf';
+import fs from 'fs';
+import path from 'path';
+import { readFileSync } from 'fs';
+import { join, dirname } from 'path';
 
 // Route imports
 import authRoutes from './routes/auth.routes.js';
@@ -24,10 +33,11 @@ import savedMedicineRoutes from './routes/savedMedicine.routes.js';
 import reviewRoutes from './routes/review.routes.js';
 
 // Load environment variables
-dotenv.config();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 
-console.log('🚀 Starting Medicine Tracker Backend...');
-console.log('📍 Environment:', process.env.NODE_ENV || 'development');
+logger.info('🚀 Starting Medicine Tracker Backend...');
+logger.info('📍 Environment:', process.env.NODE_ENV || 'development');
 
 // Initialize express app
 const app = express();
@@ -73,23 +83,30 @@ app.use(cors({
   credentials: true
 }));
 
-// Parse JSON (except for webhook route which needs raw body)
-app.use((req, res, next) => {
-  if (req.originalUrl === '/api/payments/webhook') {
-    next();
-  } else {
-    express.json()(req, res, next);
+// Capture raw body for request signing and keep normal JSON parsing elsewhere
+const jsonParser = express.json({
+  verify: (req, res, buf) => {
+    if (buf && buf.length) req.rawBody = buf;
   }
 });
 
+app.use((req, res, next) => {
+  // Let payment webhook keep its express.raw parser defined on the route
+  if (req.originalUrl === '/api/payments/webhook') return next();
+  return jsonParser(req, res, next);
+});
+
 app.use(express.urlencoded({ extended: true }));
+
+// Cookie parser is required for cookie-based CSRF protection
+app.use(cookieParser());
 
 app.use(mongoSanitize({
   replaceWith: '_',  // Replace $ and . with _ instead of removing (easier to debug)
   onSanitize: ({ req, key }) => {
     if (process.env.NODE_ENV === 'development') {
-      console.warn(`⚠️  Sanitized field "${key}" in ${req.path}`);
-    }
+        logger.warn(`⚠️  Sanitized field "${key}" in ${req.path}`);
+      }
   }
 }));
 
@@ -97,6 +114,18 @@ app.use((req, res, next) => {
   logger.http(req.method, req.path);
   next();
 });
+
+// Enforce HTTPS in production when behind a proxy (Heroku, nginx, etc.)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+  app.use((req, res, next) => {
+    const proto = req.headers['x-forwarded-proto'] || req.protocol;
+    if (proto && proto.toLowerCase() !== 'https') {
+      return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
+    }
+    next();
+  });
+}
 
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 minute window
@@ -110,6 +139,31 @@ const generalLimiter = rateLimit({
   skip: (req) => process.env.NODE_ENV === 'test'
 });
 app.use(generalLimiter);
+
+// CSRF protection (cookie-based). Exempt webhook and signed requests.
+const csrfProtection = csurf({
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production'
+  },
+  value: (req) => req.headers['x-csrf-token'] || req.body?.csrfToken
+});
+
+// Provide a token endpoint clients can call to fetch the CSRF token
+app.get('/api/csrf-token', csrfProtection, (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
+
+// Apply CSRF protection to state-changing routes, but skip webhooks and signed requests
+app.use((req, res, next) => {
+  const referer = req.get('referer') || '';
+  const isSwaggerRequest = process.env.NODE_ENV === 'development' && referer.includes('/api-docs');
+  const isExempt = req.originalUrl.startsWith('/api/payments/webhook') || !!req.headers['x-signature'] || isSwaggerRequest;
+
+  if (isExempt) return next();
+  return csrfProtection(req, res, next);
+});
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -179,6 +233,11 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/saved-medicines', savedMedicineRoutes);
 app.use('/api/reviews', reviewRoutes);
 
+const __filename = fileURLToPath(import.meta.url);
+const swaggerDocument = JSON.parse(readFileSync(join(__dirname, 'docs/openapi.json'), 'utf-8'));
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 // Welcome route
 app.get('/', (req, res) => {
   res.json({
@@ -202,8 +261,8 @@ app.get('/', (req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('❌ Error:', err.message);
-  console.error('Stack:', err.stack);
+  logger.error('❌ Error:', err.message);
+  logger.error('Stack:', err.stack);
   
   const statusCode = err.statusCode || err.status || 500;
   res.status(statusCode).json({
@@ -233,19 +292,19 @@ const startServer = async () => {
     const PORT = process.env.PORT || 5002;
 
     const server = app.listen(PORT, () => {
-      console.log(`✅ Server running on port ${PORT}`);
-      console.log(`📡 API endpoint: http://localhost:${PORT}/api`);
-      console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`🔍 DB test: http://localhost:${PORT}/api/test-db`);
+      logger.info(`✅ Server running on port ${PORT}`);
+      logger.info(`📡 API endpoint: http://localhost:${PORT}/api`);
+      logger.info(`🏥 Health check: http://localhost:${PORT}/api/health`);
+      logger.info(`🔍 DB test: http://localhost:${PORT}/api/test-db`);
     });
 
     // Graceful shutdown - SIGTERM
     process.on('SIGTERM', () => {
-      console.log('🛑 SIGTERM received, shutting down gracefully...');
+      logger.info('🛑 SIGTERM received, shutting down gracefully...');
       server.close(() => {
-        console.log('✅ Server closed');
+        logger.info('✅ Server closed');
         mongoose.connection.close(false, () => {
-          console.log('✅ MongoDB connection closed');
+          logger.info('✅ MongoDB connection closed');
           process.exit(0);
         });
       });
@@ -253,17 +312,17 @@ const startServer = async () => {
 
     // Graceful shutdown - SIGINT
     process.on('SIGINT', () => {
-      console.log('\n🛑 SIGINT received, shutting down gracefully...');
+      logger.info('\n🛑 SIGINT received, shutting down gracefully...');
       server.close(() => {
-        console.log('✅ Server closed');
+        logger.info('✅ Server closed');
         mongoose.connection.close(false, () => {
-          console.log('✅ MongoDB connection closed');
+          logger.info('✅ MongoDB connection closed');
           process.exit(0);
         });
       });
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error.message);
+    logger.error('❌ Failed to start server:', error.message);
     process.exit(1);
   }
 };

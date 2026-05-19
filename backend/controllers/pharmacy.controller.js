@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import Notification from '../models/Notification.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
 import Stock from '../models/Stock.js';
+import cache from '../utils/cache.js';
 
 const normalizePharmacyLocation = (address) => {
   if (
@@ -23,6 +24,10 @@ const normalizePharmacyLocation = (address) => {
 // Get all pharmacies
 // GET /api/pharmacies
 export const getAllPharmacies = asyncHandler(async (req, res) => {
+  const cacheKey = `pharmacies:list:${JSON.stringify(req.query || {})}`;
+  const cached = await cache.get(cacheKey);
+  if (cached) return sendSuccess(res, 200, cached, 'Pharmacies fetched (cache)');
+
   const {
     page = 1,
     limit = 10,
@@ -162,10 +167,23 @@ export const getAllPharmacies = asyncHandler(async (req, res) => {
       total
     }
   }, 'Pharmacies fetched successfully');
+  // cache result for next calls
+  await cache.set(cacheKey, {
+    pharmacies,
+    pagination: {
+      current: parseInt(page),
+      pages: Math.ceil(total / parseInt(limit)),
+      total
+    }
+  });
 });
 
 // Get pharmacy by ID
 export const getPharmacyById = asyncHandler(async (req, res) => {
+  const cacheKey = `pharmacies:id:${req.params.id}`;
+  const cached = await cache.get(cacheKey);
+  if (cached) return sendSuccess(res, 200, { pharmacy: cached }, 'Pharmacy fetched (cache)');
+
   const pharmacy = await Pharmacy.findById(req.params.id)
     .populate('owner', 'name email phone');
 
@@ -173,6 +191,7 @@ export const getPharmacyById = asyncHandler(async (req, res) => {
     return sendError(res, 404, 'Pharmacy not found');
   }
 
+  await cache.set(cacheKey, pharmacy);
   sendSuccess(res, 200, { pharmacy }, 'Pharmacy fetched successfully');
 });
 
@@ -253,6 +272,9 @@ export const registerPharmacy = asyncHandler(async (req, res) => {
   // Update user with pharmacy reference
   await User.findByIdAndUpdate(req.userId, { pharmacyId: pharmacy._id });
 
+  // invalidate cache
+  await cache.delPrefix('pharmacies:');
+
   sendSuccess(res, 201, { pharmacy }, 'Pharmacy registered successfully');
 });
 
@@ -292,6 +314,7 @@ export const updateMyPharmacy = asyncHandler(async (req, res) => {
   const updated = await pharmacy.save();
 
   sendSuccess(res, 200, { pharmacy: updated }, 'Pharmacy updated successfully');
+  await cache.delPrefix('pharmacies:');
 });
 
 // Get my pharmacy (pharmacy owner)
@@ -332,6 +355,7 @@ export const verifyPharmacy = asyncHandler(async (req, res) => {
   }
 
   sendSuccess(res, 200, { pharmacy }, 'Pharmacy approved successfully');
+  await cache.delPrefix('pharmacies:');
 });
 
 export const rejectPharmacy = asyncHandler(async (req, res) => {
@@ -363,6 +387,7 @@ export const rejectPharmacy = asyncHandler(async (req, res) => {
   }
 
   sendSuccess(res, 200, { pharmacy }, 'Pharmacy rejected successfully');
+  await cache.delPrefix('pharmacies:');
 });
 
 // Disable pharmacy (admin only)
@@ -382,6 +407,7 @@ export const disablePharmacy = asyncHandler(async (req, res) => {
   }
 
   sendSuccess(res, 200, { pharmacy }, 'Pharmacy disabled successfully');
+  await cache.delPrefix('pharmacies:');
 });
 
 // Delete pharmacy (admin only)
@@ -400,6 +426,8 @@ export const deletePharmacy = asyncHandler(async (req, res) => {
   
   // Delete pharmacy
   await Pharmacy.findByIdAndDelete(req.params.id);
+  // invalidate cache
+  await cache.delPrefix('pharmacies:');
 
   sendSuccess(res, 200, null, 'Pharmacy deleted successfully');
 });

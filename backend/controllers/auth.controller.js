@@ -4,25 +4,26 @@ import { generateTokenPair, verifyRefreshToken, generateAccessToken } from '../u
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
 import { sendPasswordResetEmail } from '../services/emailService.js';
 import crypto from 'crypto';
+import logger from '../utils/logger.js';
 
 // Register a new user
 export const register = asyncHandler(async (req, res) => {
   const { name, email, password, phone, role, address } = req.body;
 
-  console.log('📝 Register request received:', { name, email, phone, role });
+  logger.info('📝 Register request received:', { name, email, phone, role });
 
   try {
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      console.log('❌ User already exists:', email);
+      logger.warn('❌ User already exists:', email);
       return sendError(res, 400, 'User with this email already exists');
     }
 
-    console.log('✅ No existing user found, proceeding with creation');
+    logger.debug('✅ No existing user found, proceeding with creation');
 
     // Create user
-    console.log('🔄 Creating user with data:', { name, email, role, hasPhone: !!phone });
+    logger.debug('🔄 Creating user with data:', { name, email, role, hasPhone: !!phone });
     const user = await User.create({
       name,
       email,
@@ -32,7 +33,7 @@ export const register = asyncHandler(async (req, res) => {
       address
     });
 
-    console.log('✅ User created successfully in database:', {
+    logger.info('✅ User created successfully in database:', {
       id: user._id,
       email: user.email,
       name: user.name,
@@ -42,19 +43,19 @@ export const register = asyncHandler(async (req, res) => {
     // Verify user was saved
     const savedUser = await User.findById(user._id);
     if (!savedUser) {
-      console.error('❌ CRITICAL: User was created but cannot be retrieved!');
+      logger.error('❌ CRITICAL: User was created but cannot be retrieved!');
       return sendError(res, 500, 'Failed to verify user registration');
     }
-    console.log('✅ Verified: User exists in database');
+    logger.debug('✅ Verified: User exists in database');
 
     // Generate tokens
     const { accessToken, refreshToken } = generateTokenPair(user._id, user.role);
-    console.log('✅ Tokens generated');
+    logger.debug('✅ Tokens generated');
 
     // Save refresh token to user
     user.refreshToken = refreshToken;
     await user.save({ validateBeforeSave: false });
-    console.log('✅ Refresh token saved to user');
+    logger.debug('✅ Refresh token saved to user');
 
     sendSuccess(res, 201, {
       user: {
@@ -68,7 +69,7 @@ export const register = asyncHandler(async (req, res) => {
       refreshToken
     }, 'Registration successful');
   } catch (error) {
-    console.error('❌ Register error details:', {
+    logger.error('❌ Register error details:', {
       message: error.message,
       code: error.code,
       name: error.name,
@@ -189,7 +190,7 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   await user.save({ validateBeforeSave: false });
 
   await sendPasswordResetEmail(user, token);
-  console.log(`Password reset token for ${email}: ${token}`);
+  logger.debug(`Password reset token for ${email}: ${token}`);
 
   sendSuccess(res, 200, null, 'Password reset instructions sent to your email');
 });

@@ -6,6 +6,7 @@ import Order from '../models/Order.js';
 import Payment from '../models/Payment.js';
 import Stock from '../models/Stock.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
+import logger from '../utils/logger.js';
 
 // Get dashboard statistics
 export const getDashboardStats = asyncHandler(async (req, res) => {
@@ -274,7 +275,7 @@ export const updatePharmacyAdmin = asyncHandler(async (req, res) => {
     }
   } catch (err) {
     // Non-fatal: log but continue
-    console.error('Failed to update owner active status after pharmacy update:', err);
+    logger.error('Failed to update owner active status after pharmacy update:', err);
   }
 
   // Notify owner if rejection or approval

@@ -1,17 +1,41 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Create axios instance
 const api = axios.create({
-  baseURL: API_BASE_URL
+  baseURL: API_BASE_URL,
+  withCredentials: true
 });
 
-api.interceptors.request.use((req) => {
+let csrfToken = null;
+
+// Fetch CSRF token from server
+async function fetchCSRFToken() {
+  if (csrfToken) return csrfToken;
+  try {
+    const response = await axios.get(`${API_BASE_URL}/csrf-token`, { withCredentials: true });
+    csrfToken = response.data.csrfToken;
+    return csrfToken;
+  } catch (error) {
+    console.warn('Failed to fetch CSRF token:', error.message);
+    return null;
+  }
+}
+
+api.interceptors.request.use(async (req) => {
   const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
 
   if (token) {
     req.headers.Authorization = `Bearer ${token}`;
+  }
+
+  // Include CSRF token for state-changing requests
+  if (['post', 'put', 'patch', 'delete'].includes(req.method?.toLowerCase())) {
+    const csrf = await fetchCSRFToken();
+    if (csrf) {
+      req.headers['X-CSRF-Token'] = csrf;
+    }
   }
 
   return req;

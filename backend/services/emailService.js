@@ -8,6 +8,13 @@
 //   EMAIL_FROM="Medicine App <your@gmail.com>"
 
 import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import path from 'path';
+import logger from '../utils/logger.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST || 'smtp.gmail.com',
@@ -24,14 +31,17 @@ const FROM = process.env.EMAIL_FROM || 'Medicine App <noreply@medicine.app>';
 // Generic send helper
 async function sendMail(to, subject, html) {
   if (!process.env.EMAIL_USER) {
-    console.log(`[EmailService] Email not configured — skipping: ${subject} → ${to}`);
-    return;
+    const message = `Email service not configured — skipping: ${subject} → ${to}`;
+    logger.warn(`[EmailService] ${message}`);
+    throw new Error(message);
   }
+
   try {
     await transporter.sendMail({ from: FROM, to, subject, html });
-    console.log(`[EmailService] ✅ Sent: "${subject}" → ${to}`);
+    logger.info(`[EmailService] ✅ Sent: "${subject}" → ${to}`);
   } catch (err) {
-    console.error(`[EmailService] ❌ Failed: ${err.message}`);
+    logger.error(`[EmailService] ❌ Failed to send email to ${to}: ${err.message}`);
+    throw err;
   }
 }
 

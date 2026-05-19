@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { authAPI } from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
+import { validatePassword } from '../../utils/validation';
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
@@ -29,7 +30,7 @@ const ResetPassword = () => {
       return;
     }
 
-    if (password.length < 6) {
+    if (!validatePassword(password)) {
       setError('Password must be at least 6 characters.');
       return;
     }

@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
+import { validateEmail, validatePassword, validatePhone, validateRequired } from '../../utils/validation';
 
 const Register = () => {
   const location = useLocation();
@@ -50,21 +51,23 @@ const Register = () => {
       newErrors.name = 'Full name is required';
     }
 
-    if (!formData.email.trim()) {
+    if (!validateRequired(formData.email)) {
       newErrors.email = 'Email address is required';
-    } else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
+    } else if (!validateEmail(formData.email)) {
       newErrors.email = 'Please enter a valid email address';
     }
 
-    if (formData.password.length < 6) {
+    if (!validatePassword(formData.password)) {
       newErrors.password = 'Password must be at least 6 characters';
     }
 
-    if (formData.password !== formData.confirmPassword) {
+    if (!validatePassword(formData.confirmPassword)) {
+      newErrors.confirmPassword = 'Confirm password must be at least 6 characters';
+    } else if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
-    if (formData.phone && !/^[0-9]{10}$/.test(formData.phone)) {
+    if (!validatePhone(formData.phone)) {
       newErrors.phone = 'Phone number must be exactly 10 digits (or leave blank)';
     }
 

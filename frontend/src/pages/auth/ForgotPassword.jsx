@@ -2,15 +2,22 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { authAPI } from '../../services/api';
 import { useNotification } from '../../context/NotificationContext';
+import { validateEmail } from '../../utils/validation';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
   const { showNotification } = useNotification();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    if (!validateEmail(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
     setLoading(true);
 
     try {
@@ -58,11 +65,12 @@ const ForgotPassword = () => {
             type="email"
             id="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => { setEmail(e.target.value); setError(''); }}
             placeholder="Enter your email"
             autoComplete="email"
             required
           />
+          {error && <div className="input-error" style={{ color: '#c62828', marginTop: '6px' }}>{error}</div>}
         </div>
 
         <button type="submit" className="btn btn-primary btn-block" disabled={loading}>

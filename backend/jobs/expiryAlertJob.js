@@ -6,11 +6,12 @@ import cron from 'node-cron';
 import Stock from '../models/Stock.js';
 import Alert from '../models/Alert.js';
 import Pharmacy from '../models/Pharmacy.js';
+import logger from '../utils/logger.js';
 
 const THRESHOLDS = [30, 60, 90]; // days before expiry
 
 async function checkExpiringStock() {
-  console.log('🕐 [ExpiryJob] Checking for expiring stock...');
+  logger.info('🕐 [ExpiryJob] Checking for expiring stock...');
   const now = new Date();
 
   for (const days of THRESHOLDS) {
@@ -51,11 +52,11 @@ async function checkExpiringStock() {
         }
       });
 
-      console.log(`📅 [ExpiryJob] Alert created: ${item.medicine.name} expires in ${daysLeft} days`);
+      logger.info(`📅 [ExpiryJob] Alert created: ${item.medicine.name} expires in ${daysLeft} days`);
     }
   }
 
-  console.log('✅ [ExpiryJob] Done.');
+  logger.info('✅ [ExpiryJob] Done.');
 }
 
 export function startExpiryAlertJob() {
@@ -63,7 +64,7 @@ export function startExpiryAlertJob() {
   cron.schedule('0 8 * * *', checkExpiringStock, { timezone: 'Asia/Kolkata' });
 
   // Also run once on startup to catch any missed alerts
-  checkExpiringStock().catch(console.error);
+  checkExpiringStock().catch(logger.error);
 
-  console.log('🕐 Expiry alert job scheduled (daily at 8:00 AM IST)');
+  logger.info('🕐 Expiry alert job scheduled (daily at 8:00 AM IST)');
 }

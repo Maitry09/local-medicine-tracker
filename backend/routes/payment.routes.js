@@ -1,4 +1,5 @@
 import express from 'express';
+import { verifyRequestSignature } from '../middleware/signature.middleware.js';
 import {
   createPaymentOrder,
   verifyPayment,
@@ -14,7 +15,7 @@ import { mongoIdValidation, validate } from '../middleware/validation.middleware
 const router = express.Router();
 
 // Webhook route (no auth, has its own signature verification)
-router.post('/webhook', express.raw({ type: 'application/json' }), handleWebhook);
+router.post('/webhook', express.raw({ type: 'application/json' }), verifyRequestSignature, handleWebhook);
 
 // Protected routes
 router.post('/create-order', authMiddleware, createPaymentOrder);

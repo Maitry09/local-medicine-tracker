@@ -2,9 +2,13 @@ import Medicine from '../models/Medicine.js';
 import Stock from '../models/Stock.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
 import Pharmacy from '../models/Pharmacy.js';
+import cache from '../utils/cache.js';
 
 // Search medicines
 export const searchMedicines = asyncHandler(async (req, res) => {
+  const cacheKey = `medicines:search:${JSON.stringify(req.query || {})}`;
+  const cached = await cache.get(cacheKey);
+  if (cached) return sendSuccess(res, 200, cached, 'Medicines fetched (cache)');
   const { 
     q, 
     category, 
@@ -64,24 +68,34 @@ export const searchMedicines = asyncHandler(async (req, res) => {
 
   const total = await Medicine.countDocuments(query);
 
-  sendSuccess(res, 200, {
+  const payload = {
     medicines,
     pagination: {
       current: parseInt(page),
       pages: Math.ceil(total / limit),
       total
     }
-  }, 'Medicines fetched successfully');
+  };
+
+  // Cache the result
+  await cache.set(cacheKey, payload);
+
+  sendSuccess(res, 200, payload, 'Medicines fetched successfully');
 });
 
 // Get medicine by ID
 export const getMedicineById = asyncHandler(async (req, res) => {
+  const cacheKey = `medicines:id:${req.params.id}`;
+  const cached = await cache.get(cacheKey);
+  if (cached) return sendSuccess(res, 200, { medicine: cached }, 'Medicine fetched (cache)');
+
   const medicine = await Medicine.findById(req.params.id);
 
   if (!medicine) {
     return sendError(res, 404, 'Medicine not found');
   }
 
+  await cache.set(cacheKey, medicine);
   sendSuccess(res, 200, { medicine }, 'Medicine fetched successfully');
 });
 
@@ -147,6 +161,8 @@ export const getCategories = asyncHandler(async (req, res) => {
 // Create medicine (admin only)
 export const createMedicine = asyncHandler(async (req, res) => {
   const medicine = await Medicine.create(req.body);
+  // Invalidate medicine caches
+  await cache.delPrefix('medicines:');
   sendSuccess(res, 201, { medicine }, 'Medicine created successfully');
 });
 
@@ -163,6 +179,7 @@ export const updateMedicine = asyncHandler(async (req, res) => {
   }
 
   sendSuccess(res, 200, { medicine }, 'Medicine updated successfully');
+  await cache.delPrefix('medicines:');
 });
 
 // Delete medicine (admin only)
@@ -178,4 +195,5 @@ export const deleteMedicine = asyncHandler(async (req, res) => {
   }
 
   sendSuccess(res, 200, null, 'Medicine deleted successfully');
+  await cache.delPrefix('medicines:');
 });

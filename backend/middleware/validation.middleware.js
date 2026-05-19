@@ -1,13 +1,14 @@
 import { body, param, query, validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 import { sendError } from '../utils/errorHandler.js';
+import logger from '../utils/logger.js';
 
 // Middleware to check validation results
 export const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     const errorMessages = errors.array().map(err => err.msg);
-    console.log('❌ Validation failed:', {
+    logger.warn('❌ Validation failed:', {
       path: req.path,
       method: req.method,
       errors: errorMessages,
@@ -15,7 +16,7 @@ export const validate = (req, res, next) => {
     });
     return sendError(res, 400, errorMessages.join(', '));
   }
-  console.log('✅ Validation passed:', { path: req.path, method: req.method });
+  logger.debug('✅ Validation passed:', { path: req.path, method: req.method });
   next();
 };
 

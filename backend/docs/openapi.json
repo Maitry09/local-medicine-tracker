@@ -1,0 +1,1715 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "MedFinder - Medicine Tracker API",
+    "version": "1.0.0",
+    "description": "Full REST API for MedFinder — Local Medicine Availability Tracker. Supports patient, pharmacy, and admin roles."
+  },
+  "servers": [{ "url": "http://localhost:5000/api", "description": "Development server" }],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "message": { "type": "string" }
+        }
+      },
+      "Success": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "message": { "type": "string" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "role": { "type": "string", "enum": ["patient", "pharmacy", "admin"] },
+          "phone": { "type": "string" },
+          "isActive": { "type": "boolean" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Medicine": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "name": { "type": "string" },
+          "genericName": { "type": "string" },
+          "category": { "type": "string" },
+          "form": { "type": "string" },
+          "strength": { "type": "string" },
+          "manufacturer": { "type": "string" },
+          "requiresPrescription": { "type": "boolean" },
+          "mrp": { "type": "number" },
+          "isActive": { "type": "boolean" }
+        }
+      },
+      "Pharmacy": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "name": { "type": "string" },
+          "licenseNumber": { "type": "string" },
+          "address": {
+            "type": "object",
+            "properties": {
+              "street": { "type": "string" },
+              "city": { "type": "string" },
+              "state": { "type": "string" },
+              "pincode": { "type": "string" },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "type": { "type": "string", "example": "Point" },
+                  "coordinates": { "type": "array", "items": { "type": "number" } }
+                }
+              }
+            }
+          },
+          "phone": { "type": "string" },
+          "email": { "type": "string" },
+          "status": { "type": "string", "enum": ["pending", "approved", "rejected", "disabled"] },
+          "rating": { "type": "number" },
+          "isActive": { "type": "boolean" }
+        }
+      },
+      "Stock": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "medicine": { "type": "string", "description": "Medicine ID" },
+          "pharmacy": { "type": "string", "description": "Pharmacy ID" },
+          "quantity": { "type": "integer" },
+          "price": { "type": "number" },
+          "discount": { "type": "number" },
+          "expiryDate": { "type": "string", "format": "date" },
+          "isAvailable": { "type": "boolean" }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "orderNumber": { "type": "string" },
+          "user": { "type": "string" },
+          "pharmacy": { "type": "string" },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "medicine": { "type": "string" },
+                "quantity": { "type": "integer" },
+                "price": { "type": "number" }
+              }
+            }
+          },
+          "totalAmount": { "type": "number" },
+          "status": { "type": "string", "enum": ["pending", "confirmed", "dispatched", "delivered", "cancelled"] },
+          "deliveryType": { "type": "string", "enum": ["delivery", "pickup"] },
+          "paymentMethod": { "type": "string", "enum": ["online", "cod"] }
+        }
+      },
+      "Prescription": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "patient": { "type": "string" },
+          "imageUrl": { "type": "string" },
+          "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+          "responses": { "type": "array", "items": { "type": "object" } },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Review": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "user": { "type": "string" },
+          "pharmacy": { "type": "string" },
+          "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "comment": { "type": "string" }
+        }
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "user": { "type": "string" },
+          "title": { "type": "string" },
+          "message": { "type": "string" },
+          "type": { "type": "string" },
+          "isRead": { "type": "boolean" }
+        }
+      },
+      "Alert": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "user": { "type": "string" },
+          "medicine": { "type": "string" },
+          "acknowledged": { "type": "boolean" }
+        }
+      },
+      "CartItem": {
+        "type": "object",
+        "properties": {
+          "medicine": { "type": "string" },
+          "stock": { "type": "string" },
+          "quantity": { "type": "integer" },
+          "price": { "type": "number" }
+        }
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "order": { "type": "string" },
+          "razorpayOrderId": { "type": "string" },
+          "razorpayPaymentId": { "type": "string" },
+          "amount": { "type": "number" },
+          "status": { "type": "string", "enum": ["created", "paid", "failed", "refunded"] }
+        }
+      }
+    }
+  },
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+
+    "/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register a new user",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "email", "password", "role"],
+                "properties": {
+                  "name": { "type": "string", "example": "Amit Patel" },
+                  "email": { "type": "string", "example": "amit@example.com" },
+                  "password": { "type": "string", "example": "Test1234!" },
+                  "role": { "type": "string", "enum": ["patient", "pharmacy"], "example": "patient" },
+                  "phone": { "type": "string", "example": "9876543210" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "User registered successfully" },
+          "400": { "description": "Validation error or email already exists" }
+        }
+      }
+    },
+
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "User login",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "example": "amit.patel@gmail.com" },
+                  "password": { "type": "string", "example": "patient123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Login successful, returns JWT token" },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+
+    "/auth/refresh-token": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Refresh JWT access token",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["refreshToken"],
+                "properties": {
+                  "refreshToken": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "New access token returned" },
+          "401": { "description": "Invalid or expired refresh token" }
+        }
+      }
+    },
+
+    "/auth/forgot-password": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Request password reset email",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email"],
+                "properties": {
+                  "email": { "type": "string", "example": "amit.patel@gmail.com" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Reset instructions sent to email" },
+          "404": { "description": "User not found" }
+        }
+      }
+    },
+
+    "/auth/reset-password": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Reset password using token",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token", "password"],
+                "properties": {
+                  "token": { "type": "string" },
+                  "password": { "type": "string", "example": "NewPass123!" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Password reset successful" },
+          "400": { "description": "Invalid or expired token" }
+        }
+      }
+    },
+
+    "/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Logout current user",
+        "responses": {
+          "200": { "description": "Logged out successfully" }
+        }
+      }
+    },
+
+    "/auth/me": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get current logged-in user",
+        "responses": {
+          "200": { "description": "Current user data", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+
+    "/auth/profile": {
+      "put": {
+        "tags": ["Auth"],
+        "summary": "Update current user's profile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "phone": { "type": "string" },
+                  "address": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Profile updated" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+
+    "/auth/change-password": {
+      "put": {
+        "tags": ["Auth"],
+        "summary": "Change authenticated user's password",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["currentPassword", "newPassword"],
+                "properties": {
+                  "currentPassword": { "type": "string" },
+                  "newPassword": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Password changed successfully" },
+          "400": { "description": "Current password incorrect" }
+        }
+      }
+    },
+
+    "/medicines/search": {
+      "get": {
+        "tags": ["Medicines"],
+        "summary": "Search medicines by name, category, form, etc.",
+        "security": [],
+        "parameters": [
+          { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "Search query" },
+          { "name": "category", "in": "query", "schema": { "type": "string" } },
+          { "name": "form", "in": "query", "schema": { "type": "string" } },
+          { "name": "requiresPrescription", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "List of medicines matching query" }
+        }
+      }
+    },
+
+    "/medicines/categories": {
+      "get": {
+        "tags": ["Medicines"],
+        "summary": "Get all medicine categories",
+        "security": [],
+        "responses": {
+          "200": { "description": "Array of category strings" }
+        }
+      }
+    },
+
+    "/medicines/{id}": {
+      "get": {
+        "tags": ["Medicines"],
+        "summary": "Get medicine by ID",
+        "security": [],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Medicine details", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Medicine" } } } },
+          "404": { "description": "Medicine not found" }
+        }
+      },
+      "put": {
+        "tags": ["Medicines"],
+        "summary": "Update a medicine (Admin only)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Medicine" } } }
+        },
+        "responses": {
+          "200": { "description": "Medicine updated" },
+          "403": { "description": "Forbidden" }
+        }
+      },
+      "delete": {
+        "tags": ["Medicines"],
+        "summary": "Delete a medicine (Admin only)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Medicine deleted" },
+          "403": { "description": "Forbidden" }
+        }
+      }
+    },
+
+    "/medicines/{id}/availability": {
+      "get": {
+        "tags": ["Medicines"],
+        "summary": "Check medicine stock availability across pharmacies",
+        "security": [],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Availability info per pharmacy" }
+        }
+      }
+    },
+
+    "/medicines/{id}/pharmacies": {
+      "get": {
+        "tags": ["Medicines"],
+        "summary": "Get pharmacies that stock a specific medicine",
+        "security": [],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "List of pharmacies with stock info" }
+        }
+      }
+    },
+
+    "/medicines": {
+      "post": {
+        "tags": ["Medicines"],
+        "summary": "Create a new medicine (Admin only)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "category"],
+                "properties": {
+                  "name": { "type": "string", "example": "Paracetamol" },
+                  "genericName": { "type": "string" },
+                  "category": { "type": "string", "example": "Analgesic" },
+                  "form": { "type": "string", "example": "Tablet" },
+                  "strength": { "type": "string", "example": "500mg" },
+                  "manufacturer": { "type": "string" },
+                  "requiresPrescription": { "type": "boolean", "default": false },
+                  "mrp": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Medicine created" },
+          "403": { "description": "Forbidden" }
+        }
+      }
+    },
+
+    "/pharmacies": {
+      "get": {
+        "tags": ["Pharmacies"],
+        "summary": "Get all approved pharmacies",
+        "security": [],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } },
+          { "name": "city", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of pharmacies" }
+        }
+      }
+    },
+
+    "/pharmacies/register": {
+      "post": {
+        "tags": ["Pharmacies"],
+        "summary": "Register a new pharmacy profile (Pharmacy role)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "licenseNumber", "address", "phone"],
+                "properties": {
+                  "name": { "type": "string", "example": "Apollo Pharmacy" },
+                  "licenseNumber": { "type": "string" },
+                  "address": {
+                    "type": "object",
+                    "properties": {
+                      "street": { "type": "string" },
+                      "city": { "type": "string" },
+                      "state": { "type": "string" },
+                      "pincode": { "type": "string" }
+                    }
+                  },
+                  "phone": { "type": "string" },
+                  "email": { "type": "string" },
+                  "operatingHours": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Pharmacy registered, pending approval" },
+          "403": { "description": "Forbidden" }
+        }
+      }
+    },
+
+    "/pharmacies/my/details": {
+      "get": {
+        "tags": ["Pharmacies"],
+        "summary": "Get own pharmacy details (Pharmacy role)",
+        "responses": {
+          "200": { "description": "Pharmacy profile" },
+          "404": { "description": "Pharmacy not found" }
+        }
+      }
+    },
+
+    "/pharmacies/my/update": {
+      "put": {
+        "tags": ["Pharmacies"],
+        "summary": "Update own pharmacy profile (Pharmacy role)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Pharmacy" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Pharmacy updated" }
+        }
+      }
+    },
+
+    "/pharmacies/{id}": {
+      "get": {
+        "tags": ["Pharmacies"],
+        "summary": "Get pharmacy by ID",
+        "security": [],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Pharmacy details" },
+          "404": { "description": "Not found" }
+        }
+      },
+      "delete": {
+        "tags": ["Pharmacies"],
+        "summary": "Delete a pharmacy (Admin only)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Pharmacy deleted" },
+          "403": { "description": "Forbidden" }
+        }
+      }
+    },
+
+    "/pharmacies/{id}/stock": {
+      "get": {
+        "tags": ["Pharmacies"],
+        "summary": "Get all stock items for a pharmacy",
+        "security": [],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Stock list" }
+        }
+      }
+    },
+
+    "/pharmacies/{id}/medicines": {
+      "get": {
+        "tags": ["Pharmacies"],
+        "summary": "Get medicines available at a pharmacy",
+        "security": [],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "List of medicines" }
+        }
+      }
+    },
+
+    "/pharmacies/{id}/verify": {
+      "patch": {
+        "tags": ["Pharmacies"],
+        "summary": "Verify/approve a pharmacy (Admin only)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Pharmacy verified" },
+          "403": { "description": "Forbidden" }
+        }
+      }
+    },
+
+    "/pharmacies/{id}/reject": {
+      "patch": {
+        "tags": ["Pharmacies"],
+        "summary": "Reject a pharmacy registration (Admin only)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Pharmacy rejected" },
+          "403": { "description": "Forbidden" }
+        }
+      }
+    },
+
+    "/pharmacies/{id}/disable": {
+      "patch": {
+        "tags": ["Pharmacies"],
+        "summary": "Disable a pharmacy (Admin only)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Pharmacy disabled" },
+          "403": { "description": "Forbidden" }
+        }
+      }
+    },
+
+    "/stock": {
+      "get": {
+        "tags": ["Stock"],
+        "summary": "Get own pharmacy's stock list (Pharmacy/Admin)",
+        "responses": {
+          "200": { "description": "Stock items" }
+        }
+      },
+      "post": {
+        "tags": ["Stock"],
+        "summary": "Add a new stock item (Pharmacy/Admin)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["medicine", "quantity", "price", "expiryDate"],
+                "properties": {
+                  "medicine": { "type": "string", "description": "Medicine ID" },
+                  "quantity": { "type": "integer", "example": 100 },
+                  "price": { "type": "number", "example": 45.5 },
+                  "discount": { "type": "number", "example": 5 },
+                  "expiryDate": { "type": "string", "format": "date", "example": "2026-12-31" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Stock item added" }
+        }
+      }
+    },
+
+    "/stock/bulk": {
+      "post": {
+        "tags": ["Stock"],
+        "summary": "Bulk update multiple stock items (Pharmacy/Admin)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/Stock" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Bulk update done" }
+        }
+      }
+    },
+
+    "/stock/{id}": {
+      "put": {
+        "tags": ["Stock"],
+        "summary": "Update a stock item (Pharmacy/Admin)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Stock" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Stock updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Stock"],
+        "summary": "Delete a stock item (Pharmacy/Admin)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Stock deleted" }
+        }
+      }
+    },
+
+    "/cart": {
+      "get": {
+        "tags": ["Cart"],
+        "summary": "Get patient's current cart",
+        "responses": {
+          "200": { "description": "Cart contents" }
+        }
+      }
+    },
+
+    "/cart/add": {
+      "post": {
+        "tags": ["Cart"],
+        "summary": "Add an item to the cart (Patient only)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["stockId", "quantity"],
+                "properties": {
+                  "stockId": { "type": "string", "description": "Stock item ID" },
+                  "quantity": { "type": "integer", "example": 2 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Item added to cart" }
+        }
+      }
+    },
+
+    "/cart/item/{itemId}": {
+      "put": {
+        "tags": ["Cart"],
+        "summary": "Update cart item quantity (Patient only)",
+        "parameters": [{ "name": "itemId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "quantity": { "type": "integer" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Cart item updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Cart"],
+        "summary": "Remove an item from the cart (Patient only)",
+        "parameters": [{ "name": "itemId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Item removed" }
+        }
+      }
+    },
+
+    "/cart/clear": {
+      "delete": {
+        "tags": ["Cart"],
+        "summary": "Clear the entire cart (Patient only)",
+        "responses": {
+          "200": { "description": "Cart cleared" }
+        }
+      }
+    },
+
+    "/orders/my-orders": {
+      "get": {
+        "tags": ["Orders"],
+        "summary": "Get authenticated patient's orders",
+        "responses": {
+          "200": { "description": "List of patient's orders" }
+        }
+      }
+    },
+
+    "/orders": {
+      "post": {
+        "tags": ["Orders"],
+        "summary": "Create a new order (Patient only)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["pharmacyId", "items", "deliveryType"],
+                "properties": {
+                  "pharmacyId": { "type": "string" },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "medicineId": { "type": "string" },
+                        "quantity": { "type": "integer" }
+                      }
+                    }
+                  },
+                  "deliveryType": { "type": "string", "enum": ["delivery", "pickup"] },
+                  "paymentMethod": { "type": "string", "enum": ["online", "cod"] },
+                  "deliveryAddress": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Order created" }
+        }
+      }
+    },
+
+    "/orders/pharmacy/orders": {
+      "get": {
+        "tags": ["Orders"],
+        "summary": "Get orders assigned to the pharmacy (Pharmacy/Admin)",
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of pharmacy orders" }
+        }
+      }
+    },
+
+    "/orders/admin/all": {
+      "get": {
+        "tags": ["Orders"],
+        "summary": "Get all orders platform-wide (Admin only)",
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "All orders" }
+        }
+      }
+    },
+
+    "/orders/{id}": {
+      "get": {
+        "tags": ["Orders"],
+        "summary": "Get a specific order by ID",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Order details" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+
+    "/orders/{id}/cancel": {
+      "patch": {
+        "tags": ["Orders"],
+        "summary": "Cancel an order (Patient only)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Order cancelled" }
+        }
+      }
+    },
+
+    "/orders/{id}/status": {
+      "patch": {
+        "tags": ["Orders"],
+        "summary": "Update order status (Pharmacy/Admin)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["confirmed", "dispatched", "delivered", "cancelled"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Status updated" }
+        }
+      }
+    },
+
+    "/orders/{id}/payment-status": {
+      "patch": {
+        "tags": ["Orders"],
+        "summary": "Mark COD cash as collected (Pharmacy/Admin)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "COD payment status updated" }
+        }
+      }
+    },
+
+    "/prescriptions/upload": {
+      "post": {
+        "tags": ["Prescriptions"],
+        "summary": "Upload a prescription image or PDF (Patient only)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prescription": { "type": "string", "format": "binary" },
+                  "orderId": { "type": "string", "description": "Optional linked order ID" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Prescription uploaded with medicine and pharmacy suggestions" },
+          "400": { "description": "No file provided" }
+        }
+      }
+    },
+
+    "/prescriptions/my": {
+      "get": {
+        "tags": ["Prescriptions"],
+        "summary": "Get patient's own prescriptions and pharmacy responses",
+        "responses": {
+          "200": { "description": "Patient's prescriptions" }
+        }
+      }
+    },
+
+    "/prescriptions/pharmacy": {
+      "get": {
+        "tags": ["Prescriptions"],
+        "summary": "View all prescriptions — pharmacy perspective (Pharmacy only)",
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["pending", "approved", "rejected"] } }
+        ],
+        "responses": {
+          "200": { "description": "All prescriptions visible to pharmacy" }
+        }
+      }
+    },
+
+    "/prescriptions/admin": {
+      "get": {
+        "tags": ["Prescriptions"],
+        "summary": "View all prescriptions — admin perspective (Admin only)",
+        "responses": {
+          "200": { "description": "All prescriptions on platform" }
+        }
+      }
+    },
+
+    "/prescriptions/{id}": {
+      "get": {
+        "tags": ["Prescriptions"],
+        "summary": "Get prescription details (Patient / Pharmacy / Admin)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Prescription details" },
+          "403": { "description": "Access denied" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+
+    "/prescriptions/{id}/respond": {
+      "post": {
+        "tags": ["Prescriptions"],
+        "summary": "Pharmacy submits medicine suggestions for a prescription",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": { "type": "string" },
+                  "pricingDetails": { "type": "string" },
+                  "suggestedMedicines": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "medicineId": { "type": "string" },
+                        "name": { "type": "string" },
+                        "price": { "type": "number" },
+                        "available": { "type": "boolean" },
+                        "note": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Response submitted" }
+        }
+      }
+    },
+
+    "/prescriptions/{id}/review": {
+      "patch": {
+        "tags": ["Prescriptions"],
+        "summary": "Pharmacy approves or rejects a prescription",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["approved", "rejected"] },
+                  "message": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Prescription reviewed" },
+          "400": { "description": "Invalid status" }
+        }
+      }
+    },
+
+    "/payments/webhook": {
+      "post": {
+        "tags": ["Payments"],
+        "summary": "Razorpay webhook handler (no auth — signature verified internally)",
+        "security": [],
+        "responses": {
+          "200": { "description": "Webhook processed" }
+        }
+      }
+    },
+
+    "/payments/config": {
+      "get": {
+        "tags": ["Payments"],
+        "summary": "Get Razorpay public key for frontend",
+        "security": [],
+        "responses": {
+          "200": { "description": "Razorpay key ID" }
+        }
+      }
+    },
+
+    "/payments/create-order": {
+      "post": {
+        "tags": ["Payments"],
+        "summary": "Create a Razorpay payment order",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["orderId"],
+                "properties": {
+                  "orderId": { "type": "string", "description": "MedFinder order ID" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Razorpay order created" }
+        }
+      }
+    },
+
+    "/payments/verify": {
+      "post": {
+        "tags": ["Payments"],
+        "summary": "Verify a completed Razorpay payment",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["razorpay_order_id", "razorpay_payment_id", "razorpay_signature"],
+                "properties": {
+                  "razorpay_order_id": { "type": "string" },
+                  "razorpay_payment_id": { "type": "string" },
+                  "razorpay_signature": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Payment verified" },
+          "400": { "description": "Invalid signature" }
+        }
+      }
+    },
+
+    "/payments/details/{paymentId}": {
+      "get": {
+        "tags": ["Payments"],
+        "summary": "Get payment details by ID",
+        "parameters": [{ "name": "paymentId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Payment details" }
+        }
+      }
+    },
+
+    "/payments/user/all": {
+      "get": {
+        "tags": ["Payments"],
+        "summary": "Get all payments for the authenticated user",
+        "responses": {
+          "200": { "description": "User's payment history" }
+        }
+      }
+    },
+
+    "/payments/refund": {
+      "post": {
+        "tags": ["Payments"],
+        "summary": "Initiate a payment refund",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["paymentId"],
+                "properties": {
+                  "paymentId": { "type": "string" },
+                  "amount": { "type": "number", "description": "Partial refund amount (optional, full refund if omitted)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Refund initiated" }
+        }
+      }
+    },
+
+    "/alerts": {
+      "get": {
+        "tags": ["Alerts"],
+        "summary": "Get all alerts for the authenticated user",
+        "responses": {
+          "200": { "description": "List of alerts" }
+        }
+      },
+      "post": {
+        "tags": ["Alerts"],
+        "summary": "Create a new stock alert for a medicine",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["medicineId"],
+                "properties": {
+                  "medicineId": { "type": "string" },
+                  "pharmacyId": { "type": "string", "description": "Optional — alert for specific pharmacy" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Alert created" }
+        }
+      }
+    },
+
+    "/alerts/triggered/count": {
+      "get": {
+        "tags": ["Alerts"],
+        "summary": "Get count of triggered (unacknowledged) alerts",
+        "responses": {
+          "200": { "description": "Triggered alert count" }
+        }
+      }
+    },
+
+    "/alerts/{id}": {
+      "put": {
+        "tags": ["Alerts"],
+        "summary": "Update an existing alert",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Alert updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Alerts"],
+        "summary": "Delete an alert",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Alert deleted" }
+        }
+      }
+    },
+
+    "/alerts/{id}/acknowledge": {
+      "patch": {
+        "tags": ["Alerts"],
+        "summary": "Acknowledge a triggered alert",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Alert acknowledged" }
+        }
+      }
+    },
+
+    "/notifications": {
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "Get all notifications for the authenticated user",
+        "responses": {
+          "200": { "description": "List of notifications" }
+        }
+      }
+    },
+
+    "/notifications/unread-count": {
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "Get count of unread notifications",
+        "responses": {
+          "200": { "description": "Unread count" }
+        }
+      }
+    },
+
+    "/notifications/sms": {
+      "post": {
+        "tags": ["Notifications"],
+        "summary": "Send an SMS medicine reminder",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": { "type": "string" },
+                  "message": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "SMS sent" }
+        }
+      }
+    },
+
+    "/notifications/{id}/read": {
+      "patch": {
+        "tags": ["Notifications"],
+        "summary": "Mark a notification as read",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Marked as read" }
+        }
+      }
+    },
+
+    "/notifications/mark-all-read": {
+      "patch": {
+        "tags": ["Notifications"],
+        "summary": "Mark all notifications as read",
+        "responses": {
+          "200": { "description": "All marked as read" }
+        }
+      }
+    },
+
+    "/notifications/{id}": {
+      "delete": {
+        "tags": ["Notifications"],
+        "summary": "Delete a notification",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Notification deleted" }
+        }
+      }
+    },
+
+    "/reviews": {
+      "get": {
+        "tags": ["Reviews"],
+        "summary": "Get all reviews (public)",
+        "security": [],
+        "responses": {
+          "200": { "description": "All reviews" }
+        }
+      },
+      "post": {
+        "tags": ["Reviews"],
+        "summary": "Create a new review",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["pharmacyId", "rating"],
+                "properties": {
+                  "pharmacyId": { "type": "string" },
+                  "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+                  "comment": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Review created" }
+        }
+      }
+    },
+
+    "/reviews/my-reviews": {
+      "get": {
+        "tags": ["Reviews"],
+        "summary": "Get all reviews written by the authenticated user",
+        "responses": {
+          "200": { "description": "User's reviews" }
+        }
+      }
+    },
+
+    "/reviews/pharmacy/{id}": {
+      "get": {
+        "tags": ["Reviews"],
+        "summary": "Get reviews for a specific pharmacy",
+        "security": [],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Pharmacy reviews" }
+        }
+      }
+    },
+
+    "/reviews/{id}": {
+      "put": {
+        "tags": ["Reviews"],
+        "summary": "Update a review",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rating": { "type": "integer" },
+                  "comment": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Review updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Reviews"],
+        "summary": "Delete a review",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Review deleted" }
+        }
+      }
+    },
+
+    "/saved-medicines": {
+      "get": {
+        "tags": ["Saved Medicines"],
+        "summary": "Get all saved/bookmarked medicines (Patient only)",
+        "responses": {
+          "200": { "description": "Saved medicines list" }
+        }
+      },
+      "post": {
+        "tags": ["Saved Medicines"],
+        "summary": "Save/bookmark a medicine (Patient only)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["medicineId"],
+                "properties": {
+                  "medicineId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Medicine saved" }
+        }
+      }
+    },
+
+    "/saved-medicines/{id}": {
+      "delete": {
+        "tags": ["Saved Medicines"],
+        "summary": "Remove a saved medicine (Patient only)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Removed from saved" }
+        }
+      }
+    },
+
+    "/users": {
+      "get": {
+        "tags": ["Users (Admin)"],
+        "summary": "Get all users (Admin only)",
+        "parameters": [
+          { "name": "role", "in": "query", "schema": { "type": "string", "enum": ["patient", "pharmacy", "admin"] } },
+          { "name": "page", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of users" }
+        }
+      }
+    },
+
+    "/users/{id}": {
+      "get": {
+        "tags": ["Users (Admin)"],
+        "summary": "Get a user by ID (Admin only)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "User details" }
+        }
+      },
+      "put": {
+        "tags": ["Users (Admin)"],
+        "summary": "Update a user's details (Admin only)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } }
+        },
+        "responses": {
+          "200": { "description": "User updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Users (Admin)"],
+        "summary": "Delete a user (Admin only)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "User deleted" }
+        }
+      }
+    },
+
+    "/users/{id}/disable": {
+      "patch": {
+        "tags": ["Users (Admin)"],
+        "summary": "Disable a user account (Admin only)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "User disabled" }
+        }
+      }
+    },
+
+    "/users/{id}/enable": {
+      "patch": {
+        "tags": ["Users (Admin)"],
+        "summary": "Enable a user account (Admin only)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "User enabled" }
+        }
+      }
+    },
+
+    "/admin/setup": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "One-time initial admin account setup (Public — run once only)",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "email", "password"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Admin created" }
+        }
+      }
+    },
+
+    "/admin/dashboard": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Get platform-wide dashboard statistics (Admin only)",
+        "responses": {
+          "200": { "description": "Dashboard stats" }
+        }
+      }
+    },
+
+    "/admin/pharmacies": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Get all pharmacies — admin view (Admin only)",
+        "responses": {
+          "200": { "description": "All pharmacies with full details" }
+        }
+      }
+    },
+
+    "/admin/pharmacies/{id}": {
+      "put": {
+        "tags": ["Admin"],
+        "summary": "Update any pharmacy profile (Admin only)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Pharmacy" } } }
+        },
+        "responses": {
+          "200": { "description": "Pharmacy updated" }
+        }
+      }
+    },
+
+    "/admin/payments": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Get all payment records (Admin only)",
+        "responses": {
+          "200": { "description": "All payments" }
+        }
+      }
+    },
+
+    "/admin/activity": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Get platform activity/audit logs (Admin only)",
+        "responses": {
+          "200": { "description": "Activity logs" }
+        }
+      }
+    },
+
+    "/admin/admins": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Create additional admin users (Admin only)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "email", "password"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Admin user created" }
+        }
+      }
+    },
+
+    "/admin/seed-medicines": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Seed the medicine database (Admin only)",
+        "responses": {
+          "200": { "description": "Medicines seeded" }
+        }
+      }
+    },
+
+    "/health": {
+      "get": {
+        "tags": ["Utility"],
+        "summary": "API health check",
+        "security": [],
+        "responses": {
+          "200": { "description": "API is running" }
+        }
+      }
+    },
+
+    "/test-db": {
+      "get": {
+        "tags": ["Utility"],
+        "summary": "Test MongoDB connection status",
+        "security": [],
+        "responses": {
+          "200": { "description": "DB connection info and collections" }
+        }
+      }
+    }
+
+  }
+}

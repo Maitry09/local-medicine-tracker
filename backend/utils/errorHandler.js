@@ -11,10 +11,12 @@ export class AppError extends Error {
 }
 
 // Async handler wrapper to avoid try-catch in every controller
+import logger from './logger.js';
+
 export const asyncHandler = (fn) => {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch((err) => {
-      console.error('❌ Caught error in asyncHandler:', {
+      logger.error('❌ Caught error in asyncHandler:', {
         message: err.message,
         stack: err.stack,
         path: req.path,

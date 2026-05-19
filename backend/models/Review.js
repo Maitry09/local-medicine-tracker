@@ -49,6 +49,7 @@ const Review = mongoose.model('Review', reviewSchema);
 // Clean up any conflicting unique index on `order` created previously
 // Run after mongoose opens connection
 import mongooseConnection from 'mongoose';
+import logger from '../utils/logger.js';
 
 mongooseConnection.connection.on('open', async () => {
   try {
@@ -57,15 +58,15 @@ mongooseConnection.connection.on('open', async () => {
     if (orderIdx && orderIdx.unique) {
       try {
         await Review.collection.dropIndex('order_1');
-        console.log('Dropped unique index order_1 on reviews collection');
+        logger.info('Dropped unique index order_1 on reviews collection');
         await Review.collection.createIndex({ order: 1 }, { sparse: true });
-        console.log('Created sparse index on reviews.order');
+        logger.info('Created sparse index on reviews.order');
       } catch (err) {
-        console.error('Failed to drop/create review order index:', err.message);
+        logger.error('Failed to drop/create review order index:', err.message);
       }
     }
   } catch (err) {
-    console.error('Error checking review indexes:', err.message);
+    logger.error('Error checking review indexes:', err.message);
   }
 });
 
