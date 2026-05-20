@@ -17,7 +17,7 @@ import logger from './utils/logger.js';
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI );
+    await mongoose.connect(process.env.MONGODB_URI);
     logger.info("Connected to MongoDB");
   } catch (err) {
     logger.error("DB Error:", err.message);
