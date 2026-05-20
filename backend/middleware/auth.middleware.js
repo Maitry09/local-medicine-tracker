@@ -40,9 +40,10 @@ export const authMiddleware = async (req, res, next) => {
 
     if (user.role === 'pharmacy' && user.pharmacyId) {
       const pharmacy = await Pharmacy.findById(user.pharmacyId).select('isPermanentClose status isActive');
-      if (pharmacy && (pharmacy.isPermanentClose || pharmacy.status === 'disabled' )) {
+      // Only block permanently disabled pharmacies — rejected pharmacies can still login to update profile
+      if (pharmacy && (pharmacy.isPermanentClose || pharmacy.status === 'disabled')) {
         logger.debug('Pharmacy account permanently closed or disabled');
-        return sendError(res, 401, 'Your pharmacy account has been disabled. Contact support for assistance.');
+        return sendError(res, 401, 'Your pharmacy account has been permanently disabled. Contact support for assistance.');
       }
     }
 
@@ -245,7 +246,7 @@ export const optionalAuth = async (req, res, next) => {
         if (user && user.isActive) {
           if (user.role === 'pharmacy' && user.pharmacyId) {
             const pharmacy = await Pharmacy.findById(user.pharmacyId).select('isPermanentClose status isActive');
-            if (pharmacy && (pharmacy.isPermanentClose || pharmacy.status === 'disabled' || !pharmacy.isActive)) {
+            if (pharmacy && (pharmacy.isPermanentClose || pharmacy.status === 'disabled')) {
               return next();
             }
           }

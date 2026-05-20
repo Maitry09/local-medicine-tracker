@@ -50,10 +50,12 @@ const PharmacySettings = () => {
 
     setSaving(true);
     try {
-      await pharmacyAPI.updateMyPharmacy({
+      const res = await pharmacyAPI.updateMyPharmacy({
         defaultDiscount: settings.defaultDiscount,
         defaultDeliveryFee: settings.defaultDeliveryFee,
       });
+      const updated = res.data?.data?.pharmacy || res.data?.pharmacy;
+      if (updated) setPharmacy(updated);
       showNotification('Settings saved successfully!', 'success');
     } catch (error) {
       console.error('Failed to save settings:', error);
