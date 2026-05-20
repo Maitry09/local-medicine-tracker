@@ -112,7 +112,7 @@ const seedDatabase = async () => {
     // ADMIN
     const admin = await User.create({
       name: "Admin User", email: "admin@medifind.com", password: "admin123",
-      phone: "+91 9999999999", role: "admin", isActive: true, isVerified: true,
+      phone: "9999999999", role: "admin", isActive: true, isVerified: true,
       address: { street: "Admin Office", city: "Vadodara", state: "Gujarat", pincode: "390001", coordinates: { lat: 22.3072, lng: 73.1812 } }
     });
     logger.info("Admin created:", admin.email);
@@ -127,18 +127,18 @@ const seedDatabase = async () => {
     ];
     const pharmacyOwners = await User.create(ownerData.map(o => ({
       name: o.name, email: o.email, password: "pharmacy123",
-      phone: "+91 9876543210", role: "pharmacy", isActive: true, isVerified: true,
+      phone: "9876543210", role: "pharmacy", isActive: true, isVerified: true,
       address: { street: "Pharmacy Street", city: "Vadodara", state: "Gujarat", pincode: o.pincode, coordinates: { lat: o.lat, lng: o.lng } }
     })));
     logger.info(pharmacyOwners.length, "pharmacy owners created");
 
     // PHARMACIES
     const pharmData = [
-      { name: "Apollo Pharmacy - Alkapuri", license: "GUJ-PHARM-2023-001", email: "apollo.alkapuri@apollopharmacy.in", phone: "+91 265 2334455", street: "10, Alkapuri Society", pincode: "390007", lat: 22.3072, lng: 73.1812, open: "08:00", close: "22:00", is24: false, rating: 4.5, totalRatings: 128 },
-      { name: "MedPlus - Fatehgunj", license: "GUJ-PHARM-2023-002", email: "medplus.fatehgunj@medplus.in", phone: "+91 265 2445566", street: "22, Fatehgunj Main Road", pincode: "390002", lat: 22.3195, lng: 73.1925, open: "09:00", close: "21:00", is24: false, rating: 4.3, totalRatings: 95 },
-      { name: "Lifeline Medical Store", license: "GUJ-PHARM-2023-003", email: "lifeline.manjalpur@gmail.com", phone: "+91 265 2556677", street: "5, Manjalpur Ring Road", pincode: "390011", lat: 22.3155, lng: 73.1896, open: "00:00", close: "23:59", is24: true, rating: 4.7, totalRatings: 210 },
-      { name: "Wellness Pharmacy - Karelibaug", license: "GUJ-PHARM-2023-004", email: "wellness.karelibaug@gmail.com", phone: "+91 265 2667788", street: "8, Karelibaug Near Temple", pincode: "390018", lat: 22.3089, lng: 73.1812, open: "08:30", close: "21:30", is24: false, rating: 4.2, totalRatings: 73 },
-      { name: "Care Medicals - Waghodia", license: "GUJ-PHARM-2023-005", email: "care.waghodia@gmail.com", phone: "+91 265 2778899", street: "15, Waghodia Road Crossing", pincode: "390019", lat: 22.2760, lng: 73.1885, open: "09:00", close: "20:00", is24: false, rating: 4.0, totalRatings: 42 }
+      { name: "Apollo Pharmacy - Alkapuri", license: "GUJ-PHARM-2023-001", email: "apollo.alkapuri@apollopharmacy.in", phone: " 265 2334455", street: "10, Alkapuri Society", pincode: "390007", lat: 22.3072, lng: 73.1812, open: "08:00", close: "22:00", is24: false, rating: 4.5, totalRatings: 128 },
+      { name: "MedPlus - Fatehgunj", license: "GUJ-PHARM-2023-002", email: "medplus.fatehgunj@medplus.in", phone: " 265 2445566", street: "22, Fatehgunj Main Road", pincode: "390002", lat: 22.3195, lng: 73.1925, open: "09:00", close: "21:00", is24: false, rating: 4.3, totalRatings: 95 },
+      { name: "Lifeline Medical Store", license: "GUJ-PHARM-2023-003", email: "lifeline.manjalpur@gmail.com", phone: " 265 2556677", street: "5, Manjalpur Ring Road", pincode: "390011", lat: 22.3155, lng: 73.1896, open: "00:00", close: "23:59", is24: true, rating: 4.7, totalRatings: 210 },
+      { name: "Wellness Pharmacy - Karelibaug", license: "GUJ-PHARM-2023-004", email: "wellness.karelibaug@gmail.com", phone: " 265 2667788", street: "8, Karelibaug Near Temple", pincode: "390018", lat: 22.3089, lng: 73.1812, open: "08:30", close: "21:30", is24: false, rating: 4.2, totalRatings: 73 },
+      { name: "Care Medicals - Waghodia", license: "GUJ-PHARM-2023-005", email: "care.waghodia@gmail.com", phone: " 265 2778899", street: "15, Waghodia Road Crossing", pincode: "390019", lat: 22.2760, lng: 73.1885, open: "09:00", close: "20:00", is24: false, rating: 4.0, totalRatings: 42 }
     ];
     const pharmacies = await Pharmacy.create(pharmData.map((p, i) => ({
       name: p.name, owner: pharmacyOwners[i]._id, licenseNumber: p.license,
@@ -185,16 +185,16 @@ const seedDatabase = async () => {
 
     // PATIENTS
     const patientData = [
-      { name: "Amit Patel", email: "amit.patel@gmail.com", phone: "+91 9876501001", street: "12 Alkapuri", pincode: "390007", lat: 22.3103, lng: 73.1877 },
-      { name: "Neha Shah", email: "neha.shah@gmail.com", phone: "+91 9876501002", street: "45 Manjalpur", pincode: "390011", lat: 22.2847, lng: 73.1833 },
-      { name: "Ravi Joshi", email: "ravi.joshi@gmail.com", phone: "+91 9876501003", street: "7 Fatehgunj", pincode: "390002", lat: 22.2917, lng: 73.1700 },
-      { name: "Kavita Desai", email: "kavita.desai@gmail.com", phone: "+91 9876501004", street: "22 Karelibaug", pincode: "390018", lat: 22.2642, lng: 73.1956 },
-      { name: "Sunil Mehta", email: "sunil.mehta@gmail.com", phone: "+91 9876501005", street: "3 Waghodia Rd", pincode: "390019", lat: 22.3264, lng: 73.1772 },
-      { name: "Pooja Singh", email: "pooja.singh@gmail.com", phone: "+91 9876501006", street: "88 Sayajigunj", pincode: "390005", lat: 22.3031, lng: 73.1961 },
-      { name: "Mahesh Trivedi", email: "mahesh.trivedi@gmail.com", phone: "+91 9876501007", street: "11 Vasna", pincode: "390015", lat: 22.3264, lng: 73.1892 },
-      { name: "Anita Kulkarni", email: "anita.kulkarni@gmail.com", phone: "+91 9876501008", street: "34 Gotri", pincode: "390021", lat: 22.2985, lng: 73.1741 },
-      { name: "Deepak Rao", email: "deepak.rao@gmail.com", phone: "+91 9876501009", street: "56 Akota", pincode: "390020", lat: 22.3148, lng: 73.1689 },
-      { name: "Sunita Verma", email: "sunita.verma@gmail.com", phone: "+91 9876501010", street: "9 Nizampura", pincode: "390002", lat: 22.3215, lng: 73.2001 }
+      { name: "Amit Patel", email: "amit.patel@gmail.com", phone: " 9876501001", street: "12 Alkapuri", pincode: "390007", lat: 22.3103, lng: 73.1877 },
+      { name: "Neha Shah", email: "neha.shah@gmail.com", phone: " 9876501002", street: "45 Manjalpur", pincode: "390011", lat: 22.2847, lng: 73.1833 },
+      { name: "Ravi Joshi", email: "ravi.joshi@gmail.com", phone: " 9876501003", street: "7 Fatehgunj", pincode: "390002", lat: 22.2917, lng: 73.1700 },
+      { name: "Kavita Desai", email: "kavita.desai@gmail.com", phone: " 9876501004", street: "22 Karelibaug", pincode: "390018", lat: 22.2642, lng: 73.1956 },
+      { name: "Sunil Mehta", email: "sunil.mehta@gmail.com", phone: " 9876501005", street: "3 Waghodia Rd", pincode: "390019", lat: 22.3264, lng: 73.1772 },
+      { name: "Pooja Singh", email: "pooja.singh@gmail.com", phone: " 9876501006", street: "88 Sayajigunj", pincode: "390005", lat: 22.3031, lng: 73.1961 },
+      { name: "Mahesh Trivedi", email: "mahesh.trivedi@gmail.com", phone: " 9876501007", street: "11 Vasna", pincode: "390015", lat: 22.3264, lng: 73.1892 },
+      { name: "Anita Kulkarni", email: "anita.kulkarni@gmail.com", phone: " 9876501008", street: "34 Gotri", pincode: "390021", lat: 22.2985, lng: 73.1741 },
+      { name: "Deepak Rao", email: "deepak.rao@gmail.com", phone: " 9876501009", street: "56 Akota", pincode: "390020", lat: 22.3148, lng: 73.1689 },
+      { name: "Sunita Verma", email: "sunita.verma@gmail.com", phone: " 9876501010", street: "9 Nizampura", pincode: "390002", lat: 22.3215, lng: 73.2001 }
     ];
     const patients = await User.create(patientData.map(p => ({
       name: p.name, email: p.email, password: "patient123", phone: p.phone,
