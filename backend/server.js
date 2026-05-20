@@ -43,6 +43,8 @@ logger.info('📍 Environment:', process.env.NODE_ENV || 'development');
 // Initialize express app
 const app = express();
 
+app.set('trust proxy', 1);
+
 // Security headers
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow frontend to fetch resources
