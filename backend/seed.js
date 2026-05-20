@@ -94,6 +94,12 @@ const seedDatabase = async () => {
   try {
     await connectDB();
 
+    const existingMedicines = await Medicine.countDocuments();
+      if (existingMedicines > 0) {
+        logger.info("✅ Database already has data, skipping seed.");
+        process.exit(0);
+      }
+
     logger.info("Clearing database...");
     await Promise.all([
       Review.deleteMany({}), Prescription.deleteMany({}), Alert.deleteMany({}),
