@@ -17,7 +17,7 @@ import { registerValidation, loginValidation, forgotPasswordValidation, resetPas
 const router = express.Router();
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 minute window
-  max: 10,                    // max 10 attempts per window per IP
+  max: 100,                    // max 100 attempts per window per IP
   standardHeaders: true,
   legacyHeaders: false,
   message: {
