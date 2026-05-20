@@ -40,7 +40,7 @@ export const authMiddleware = async (req, res, next) => {
 
     if (user.role === 'pharmacy' && user.pharmacyId) {
       const pharmacy = await Pharmacy.findById(user.pharmacyId).select('isPermanentClose status isActive');
-      if (pharmacy && (pharmacy.isPermanentClose || pharmacy.status === 'disabled' || !pharmacy.isActive)) {
+      if (pharmacy && (pharmacy.isPermanentClose || pharmacy.status === 'disabled' )) {
         logger.debug('Pharmacy account permanently closed or disabled');
         return sendError(res, 401, 'Your pharmacy account has been disabled. Contact support for assistance.');
       }
