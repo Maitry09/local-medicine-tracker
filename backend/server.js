@@ -69,17 +69,20 @@ app.use(cors({
     
     // Allow specific frontend URL if set
     const allowedOrigins = [
-      process.env.FRONTEND_URL,
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://localhost:5175'
-    ].filter(Boolean);
-    
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    
-    return callback(new Error('Not allowed by CORS'));
+        process.env.FRONTEND_URL,
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:5175'
+      ].filter(Boolean);
+
+      // Trim and compare to avoid whitespace issues
+      if (allowedOrigins.map(o => o.trim()).includes(origin.trim())) {
+        return callback(null, true);
+      }
+
+      console.log('❌ CORS blocked origin:', origin);
+      console.log('✅ Allowed origins:', allowedOrigins);
+      return callback(new Error('Not allowed by CORS'));
   },
   credentials: true
 }));
