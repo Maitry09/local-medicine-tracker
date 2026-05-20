@@ -17,7 +17,7 @@ import logger from './utils/logger.js';
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/medicine_tracker');
+    await mongoose.connect(process.env.MONGODB_URI );
     logger.info("Connected to MongoDB");
   } catch (err) {
     logger.error("DB Error:", err.message);
