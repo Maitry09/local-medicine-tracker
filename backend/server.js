@@ -47,15 +47,8 @@ app.set('trust proxy', 1);
 
 // Security headers
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow frontend to fetch resources
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      imgSrc: ["'self'", 'data:', 'https:'],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-    }
-  }
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false  // disable CSP - frontend is separate
 }));
 
 // Middleware
