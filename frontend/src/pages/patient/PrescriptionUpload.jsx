@@ -31,19 +31,7 @@ export default function PrescriptionUpload() {
       const response = await api.post('/prescriptions/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      const suggestions = response.data?.data?.suggestions || { medicines: [], pharmacies: [] };
-      const medicineNames = suggestions.medicines?.map((item) => item.name) || [];
-      const pharmacyNames = suggestions.pharmacies?.map((item) => item.name) || [];
-      const suggestionText = [];
-      if (medicineNames.length) suggestionText.push(`Medicines: ${medicineNames.join(', ')}`);
-      if (pharmacyNames.length) suggestionText.push(`Pharmacies: ${pharmacyNames.join(', ')}`);
-      showNotification(
-        suggestionText.length
-          ? `✅ Prescription uploaded! Suggested ${suggestionText.join(' | ')}`
-          : '✅ Prescription uploaded! Pharmacy will review shortly.',
-        'success',
-        6000
-      );
+      showNotification('✅ Prescription uploaded! Pharmacy will review shortly.', 'success', 6000);
       navigate(orderId ? `/orders/${orderId}` : '/dashboard');
     } catch (err) {
       showNotification(err.response?.data?.message || 'Upload failed', 'error', 4000);

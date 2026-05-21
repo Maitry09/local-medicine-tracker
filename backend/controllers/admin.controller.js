@@ -6,7 +6,6 @@ import Order from '../models/Order.js';
 import Payment from '../models/Payment.js';
 import Stock from '../models/Stock.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
-import logger from '../utils/logger.js';
 
 // Get dashboard statistics
 export const getDashboardStats = asyncHandler(async (req, res) => {
@@ -235,13 +234,16 @@ export const updatePharmacyAdmin = asyncHandler(async (req, res) => {
   }
   if (typeof tempCloseUntil !== 'undefined') update.tempCloseUntil = tempCloseUntil;
 
-  // Handle rejection reason
-  if (status === 'rejected' && rejectionReason) {
-    update.rejectionReason = rejectionReason;
-    update.isActive = false;
+  // Handle rejection reason — do NOT deactivate user, just mark pharmacy rejected
+  if (status === 'rejected') {
+    update.status = 'rejected';
+    update.isActive = false; // hide from listings only
+    if (rejectionReason) update.rejectionReason = rejectionReason;
   } else if (status === 'approved') {
-    // Clear rejection reason on approval
-    update.rejectionReason = undefined;
+    update.status = 'approved';
+    update.isActive = true;
+    update.isVerified = true;
+    update.rejectionReason = null;
   }
 
   const pharmacy = await Pharmacy.findByIdAndUpdate(
@@ -254,29 +256,23 @@ export const updatePharmacyAdmin = asyncHandler(async (req, res) => {
     return sendError(res, 404, 'Pharmacy not found');
   }
 
-  // If admin disabled the pharmacy permanently, also deactivate the owner user account
-  try {
-    if (typeof isPermanentClose !== 'undefined') {
-      const ownerId = pharmacy.owner?._id || pharmacy.owner;
-      if (ownerId) {
-        if (isPermanentClose === true) {
-          await User.findByIdAndUpdate(ownerId, { isActive: false, refreshToken: null });
-        } else {
-          await User.findByIdAndUpdate(ownerId, { isActive: true });
-        }
-      }
+  // Additionally, if status was set to 'disabled' via isPermanentClose, deactivate owner
+  if (update.status === 'disabled' && update.isPermanentClose === true) {
+    const ownerId = pharmacy.owner?._id || pharmacy.owner;
+    if (ownerId) {
+      await User.findByIdAndUpdate(ownerId, { isActive: false, refreshToken: null });
     }
-    // Additionally, if status was set to 'disabled', make sure owner account is deactivated
-    if (update.isActive === false || update.status === 'disabled') {
-      const ownerId = pharmacy.owner?._id || pharmacy.owner;
-      if (ownerId) {
-        await User.findByIdAndUpdate(ownerId, { isActive: false, refreshToken: null });
-      }
-    }
-  } catch (err) {
-    // Non-fatal: log but continue
-    logger.error('Failed to update owner active status after pharmacy update:', err);
   }
+
+  // If reopening from permanent close, reactivate owner too
+  if (update.isPermanentClose === false) {
+    const ownerId = pharmacy.owner?._id || pharmacy.owner;
+    if (ownerId) {
+      await User.findByIdAndUpdate(ownerId, { isActive: true });
+    }
+  }
+
+  // NEVER deactivate owner for rejection — rejected pharmacy owners can still login
 
   // Notify owner if rejection or approval
   if (status === 'rejected' && rejectionReason && pharmacy.owner) {

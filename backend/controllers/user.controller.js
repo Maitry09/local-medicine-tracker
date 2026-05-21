@@ -1,4 +1,5 @@
 import User from '../models/User.js';
+import Pharmacy from '../models/Pharmacy.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
 
 // Get all users (admin only)
@@ -93,6 +94,18 @@ export const enableUser = asyncHandler(async (req, res) => {
 
   if (!user) {
     return sendError(res, 404, 'User not found');
+  }
+
+  // If this is a pharmacy owner, also reactivate the pharmacy (only if permanently closed, not rejected)
+  if (user.role === 'pharmacy' && user.pharmacyId) {
+    const pharmacy = await Pharmacy.findById(user.pharmacyId);
+    if (pharmacy && pharmacy.status === 'disabled') {
+      await Pharmacy.findByIdAndUpdate(user.pharmacyId, {
+        isActive: true,
+        isPermanentClose: false,
+        status: 'approved'
+      });
+    }
   }
 
   sendSuccess(res, 200, { user }, 'User enabled successfully');
