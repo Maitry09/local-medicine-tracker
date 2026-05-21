@@ -7,7 +7,6 @@ import { sendError } from '../utils/errorHandler.js';
 // Middleware to verify JWT token
 export const authMiddleware = async (req, res, next) => {
   try {
-    // Get token from header
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -16,8 +15,6 @@ export const authMiddleware = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
-    
-    // Verify token
     const decoded = verifyAccessToken(token);
     
     if (!decoded) {
@@ -25,7 +22,6 @@ export const authMiddleware = async (req, res, next) => {
       return sendError(res, 401, 'Invalid or expired token');
     }
 
-    // Get user from database
     const user = await User.findById(decoded.userId).populate('pharmacyId');
     
     if (!user) {
@@ -40,15 +36,14 @@ export const authMiddleware = async (req, res, next) => {
 
     if (user.role === 'pharmacy' && user.pharmacyId) {
       const pharmacy = await Pharmacy.findById(user.pharmacyId).select('isPermanentClose status');
-      // Only block permanently closed or admin-disabled pharmacies
-      // Rejected pharmacies can still login to view reason and update profile
-      if (pharmacy && (pharmacy.isPermanentClose || pharmacy.status === 'disabled')) {
+      // Only block permanently closed or admin-disabled pharmacies.
+      // Rejected pharmacies CAN login to view rejection reason, update profile, and resubmit.
+      if (pharmacy && (pharmacy.isPermanentClose === true || pharmacy.status === 'disabled')) {
         logger.debug('Pharmacy account permanently closed or disabled');
         return sendError(res, 401, 'Your pharmacy account has been permanently disabled. Contact support.');
       }
     }
 
-    // Attach user to request
     req.user = user;
     req.userId = decoded.userId;
     req.userRole = decoded.role;
@@ -81,7 +76,6 @@ export const requireRole = (...allowedRoles) => {
 
 // Granular permission system
 const PERMISSIONS = {
-  // Patient permissions
   'medicines:search': ['patient', 'pharmacy', 'admin'],
   'medicines:view': ['patient', 'pharmacy', 'admin'],
   'pharmacies:list': ['patient', 'pharmacy', 'admin'],
@@ -92,8 +86,6 @@ const PERMISSIONS = {
   'alerts:manage_own': ['patient', 'pharmacy', 'admin'],
   'payments:create': ['patient', 'pharmacy', 'admin'],
   'profile:update_own': ['patient', 'pharmacy', 'admin'],
-  
-  // Pharmacy permissions
   'stock:add': ['pharmacy', 'admin'],
   'stock:update': ['pharmacy', 'admin'],
   'stock:delete': ['pharmacy', 'admin'],
@@ -105,8 +97,6 @@ const PERMISSIONS = {
   'pharmacy:view_own': ['pharmacy', 'admin'],
   'orders:view_pharmacy': ['pharmacy', 'admin'],
   'orders:update_status': ['pharmacy', 'admin'],
-  
-  // Admin permissions
   'users:view_all': ['admin'],
   'users:create': ['admin'],
   'users:update_any': ['admin'],
@@ -128,7 +118,6 @@ const PERMISSIONS = {
   'alerts:view_all': ['admin'],
 };
 
-// Middleware to check specific permissions
 export const requirePermission = (permission) => {
   return (req, res, next) => {
     if (!req.user) {
@@ -152,11 +141,9 @@ export const requirePermission = (permission) => {
   };
 };
 
-// Check if user owns the resource (for user-specific resources)
 export const requireOwnership = (Model, paramName = 'id', ownerField = 'userId') => {
   return async (req, res, next) => {
     try {
-      // Admins bypass ownership check
       if (req.user.role === 'admin') {
         logger.info(' Admin user - ownership check bypassed');
         return next();
@@ -169,7 +156,6 @@ export const requireOwnership = (Model, paramName = 'id', ownerField = 'userId')
         return sendError(res, 404, 'Resource not found');
       }
 
-      // Check ownership
       const ownerId = resource[ownerField]?.toString();
       const userId = req.userId.toString();
 
@@ -188,17 +174,14 @@ export const requireOwnership = (Model, paramName = 'id', ownerField = 'userId')
   };
 };
 
-// Check if pharmacy owns the resource
 export const requirePharmacyOwnership = (Model, paramName = 'id') => {
   return async (req, res, next) => {
     try {
-      // Admins bypass ownership check
       if (req.user.role === 'admin') {
         logger.info(' Admin user - pharmacy ownership check bypassed');
         return next();
       }
 
-      // Only pharmacies can proceed
       if (req.user.role !== 'pharmacy') {
         return sendError(res, 403, 'Access denied. Pharmacy role required');
       }
@@ -210,7 +193,6 @@ export const requirePharmacyOwnership = (Model, paramName = 'id') => {
         return sendError(res, 404, 'Resource not found');
       }
 
-      // Check if pharmacy owns this resource
       const pharmacyId = req.user.pharmacyId?.toString();
       const resourcePharmacyId = resource.pharmacyId?.toString();
 
@@ -233,7 +215,7 @@ export const requirePharmacyOwnership = (Model, paramName = 'id') => {
   };
 };
 
-// Optional auth middleware (doesn't fail if no token)
+// Optional auth — never blocks, just tries to identify the user
 export const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -247,7 +229,8 @@ export const optionalAuth = async (req, res, next) => {
         if (user && user.isActive) {
           if (user.role === 'pharmacy' && user.pharmacyId) {
             const pharmacy = await Pharmacy.findById(user.pharmacyId).select('isPermanentClose status');
-            if (pharmacy && (pharmacy.isPermanentClose || pharmacy.status === 'disabled')) {
+            // Skip attaching pharmacy user if permanently disabled — but don't block
+            if (pharmacy && (pharmacy.isPermanentClose === true || pharmacy.status === 'disabled')) {
               return next();
             }
           }
@@ -265,5 +248,4 @@ export const optionalAuth = async (req, res, next) => {
   next();
 };
 
-// Export all permissions for documentation/testing
 export const getAllPermissions = () => PERMISSIONS;
