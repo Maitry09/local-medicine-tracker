@@ -1,83 +1,51 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002/api';
 
 // Create axios instance
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  withCredentials: true
+  baseURL: API_BASE_URL
 });
 
-let csrfToken = null;
-
-// Fetch CSRF token from server
-async function fetchCSRFToken() {
-  if (csrfToken) return csrfToken;
-  try {
-    const response = await axios.get(`${API_BASE_URL}/csrf-token`, { withCredentials: true });
-    csrfToken = response.data.csrfToken;
-    return csrfToken;
-  } catch (error) {
-    console.warn('Failed to fetch CSRF token:', error.message);
-    return null;
-  }
-}
-
-api.interceptors.request.use(async (req) => {
+// Request interceptor - attach auth token only
+api.interceptors.request.use((req) => {
   const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-
   if (token) {
     req.headers.Authorization = `Bearer ${token}`;
   }
-
-  // Include CSRF token for state-changing requests
-  if (['post', 'put', 'patch', 'delete'].includes(req.method?.toLowerCase())) {
-    const csrf = await fetchCSRFToken();
-    if (csrf) {
-      req.headers['X-CSRF-Token'] = csrf;
-    }
-  }
-
   return req;
 });
 
-// Response interceptor - handle token refresh
+// Response interceptor - handle token refresh on 401
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // If 401 and we haven't tried refreshing yet
     if (error.response?.status === 401 && !originalRequest._retry) {
-      
-      // Don't try to refresh if it's a login or registration request
-      if (originalRequest.url?.includes('/auth/login') || 
-          originalRequest.url?.includes('/auth/register') ||
-          originalRequest.url?.includes('/auth/refresh-token')) {
+      if (
+        originalRequest.url?.includes('/auth/login') ||
+        originalRequest.url?.includes('/auth/register') ||
+        originalRequest.url?.includes('/auth/refresh-token')
+      ) {
         return Promise.reject(error);
       }
-      
+
       originalRequest._retry = true;
 
       try {
         const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) {
-          throw new Error('No refresh token');
-        }
+        if (!refreshToken) throw new Error('No refresh token');
 
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {
-          refreshToken
-        });
-
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh-token`, { refreshToken });
         const { accessToken } = response.data.data;
-        // keep both keys for compatibility
+
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('token', accessToken);
 
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // Clear tokens and redirect to login
         localStorage.removeItem('accessToken');
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
@@ -98,12 +66,10 @@ export const authAPI = {
   logout: () => api.post('/auth/logout'),
   getMe: () => api.get('/auth/me'),
   updateProfile: (data) => api.put('/auth/profile', data),
-  changePassword: (data) => api.put('/auth/change-password', data)
+  changePassword: (data) => api.put('/auth/change-password', data),
+  forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
+  resetPassword: (token, password) => api.post('/auth/reset-password', { token, password })
 };
-
-// extend auth API with forgot/reset
-authAPI.forgotPassword = (email) => api.post('/auth/forgot-password', { email });
-authAPI.resetPassword = (token, password) => api.post('/auth/reset-password', { token, password });
 
 // Medicine API
 export const medicineAPI = {
@@ -132,11 +98,11 @@ export const pharmacyAPI = {
   getStock: (id, params) => api.get(`/pharmacies/${id}/stock`, { params }),
   register: (data) => api.post('/pharmacies/register', data),
   getMyPharmacy: () => api.get('/pharmacies/my/details'),
-  getMyPharmacyStock: (params) => api.get('/stock', { params }), // ← ADD THIS
+  getMyPharmacyStock: (params) => api.get('/stock', { params }),
   updateMyPharmacy: (data) => api.put('/pharmacies/my/update', data),
   verify: (id) => api.patch(`/pharmacies/${id}/verify`),
   disable: (id) => api.patch(`/pharmacies/${id}/disable`),
-  delete: (id) => api.delete(`/pharmacies/${id}`),
+  delete: (id) => api.delete(`/pharmacies/${id}`)
 };
 
 // Stock API
@@ -234,8 +200,7 @@ export const adminAPI = {
   updatePharmacy: (id, data) => api.put(`/admin/pharmacies/${id}`, data),
   getAllPayments: (params) => api.get('/admin/payments', { params }),
   getActivityLogs: (params) => api.get('/admin/activity', { params }),
-  seedMedicines: () => api.post('/admin/seed-medicines')
-  ,
+  seedMedicines: () => api.post('/admin/seed-medicines'),
   createAdmin: (data) => api.post('/admin/admins', data)
 };
 
