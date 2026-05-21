@@ -1,5 +1,4 @@
 import User from '../models/User.js';
-import Pharmacy from '../models/Pharmacy.js';
 import { asyncHandler, sendSuccess, sendError } from '../utils/errorHandler.js';
 
 // Get all users (admin only)
@@ -78,36 +77,39 @@ export const disableUser = asyncHandler(async (req, res) => {
     return sendError(res, 400, 'Cannot deactivate admin users');
   }
 
-  userToDisable.isActive = false;
-  await userToDisable.save();
+  // Use findByIdAndUpdate to bypass pre-save hooks
+  const updated = await User.findByIdAndUpdate(
+    req.params.id,
+    { $set: { isActive: false, refreshToken: null } },
+    { new: true, runValidators: false }
+  );
 
-  sendSuccess(res, 200, { user: userToDisable }, 'User disabled successfully');
+  sendSuccess(res, 200, { user: updated }, 'User disabled successfully');
 });
 
 // Enable user (admin only)
 export const enableUser = asyncHandler(async (req, res) => {
   const user = await User.findByIdAndUpdate(
     req.params.id,
-    { isActive: true },
-    { new: true }
+    { $set: { isActive: true } },
+    { new: true, runValidators: false }
   );
 
   if (!user) {
     return sendError(res, 404, 'User not found');
   }
 
-  // If this is a pharmacy owner, also reactivate the pharmacy if it was permanently disabled
+  // If pharmacy owner, also reactivate pharmacy if it was permanently disabled
   if (user.role === 'pharmacy' && user.pharmacyId) {
+    const Pharmacy = (await import('../models/Pharmacy.js')).default;
     const pharmacy = await Pharmacy.findById(user.pharmacyId);
     if (pharmacy && pharmacy.status === 'disabled') {
-      await Pharmacy.findByIdAndUpdate(user.pharmacyId, {
-        isActive: true,
-        isPermanentClose: false,
-        status: 'approved'
-      });
+      await Pharmacy.findByIdAndUpdate(
+        user.pharmacyId,
+        { $set: { isActive: true, isPermanentClose: false, status: 'approved' } },
+        { runValidators: false }
+      );
     }
-    // Note: rejected pharmacies are NOT touched here — their status stays rejected
-    // so admin must separately approve them after the owner resubmits
   }
 
   sendSuccess(res, 200, { user }, 'User enabled successfully');
