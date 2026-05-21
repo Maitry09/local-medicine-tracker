@@ -10,7 +10,6 @@ export const authMiddleware = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      logger.debug('No authorization header or invalid format');
       return sendError(res, 401, 'Access denied. No token provided');
     }
 
@@ -18,37 +17,31 @@ export const authMiddleware = async (req, res, next) => {
     const decoded = verifyAccessToken(token);
     
     if (!decoded) {
-      logger.debug('Token verification failed');
       return sendError(res, 401, 'Invalid or expired token');
     }
 
     const user = await User.findById(decoded.userId).populate('pharmacyId');
     
     if (!user) {
-      logger.debug('User not found for token');
       return sendError(res, 401, 'User not found');
     }
 
     if (!user.isActive) {
-      logger.debug('User account is deactivated');
       return sendError(res, 401, 'Your account has been deactivated by an administrator');
     }
 
     if (user.role === 'pharmacy' && user.pharmacyId) {
       const pharmacy = await Pharmacy.findById(user.pharmacyId).select('isPermanentClose status');
-      // Only block permanently closed or admin-disabled pharmacies.
-      // Rejected pharmacies CAN login to view rejection reason, update profile, and resubmit.
+      // ONLY block permanently closed or admin-disabled pharmacies
+      // Rejected pharmacies CAN login to see reason and resubmit
       if (pharmacy && (pharmacy.isPermanentClose === true || pharmacy.status === 'disabled')) {
-        logger.debug('Pharmacy account permanently closed or disabled');
-        return sendError(res, 401, 'Your pharmacy account has been permanently disabled. Contact support.');
+        return sendError(res, 401, 'Your pharmacy has been permanently disabled. Contact support.');
       }
     }
 
     req.user = user;
     req.userId = decoded.userId;
     req.userRole = decoded.role;
-    
-    logger.info(' User authenticated:', { userId: decoded.userId, role: decoded.role });
     
     next();
   } catch (error) {
@@ -63,13 +56,9 @@ export const requireRole = (...allowedRoles) => {
     if (!req.user) {
       return sendError(res, 401, 'Authentication required');
     }
-
     if (!allowedRoles.includes(req.user.role)) {
-      logger.debug(` Role check failed. User role: ${req.user.role}, Required: ${allowedRoles.join(', ')}`);
       return sendError(res, 403, `Access denied. Required roles: ${allowedRoles.join(', ')}`);
     }
-
-    logger.debug(` Role check passed for ${req.user.role}`);
     next();
   };
 };
@@ -123,20 +112,13 @@ export const requirePermission = (permission) => {
     if (!req.user) {
       return sendError(res, 401, 'Authentication required');
     }
-
     const allowedRoles = PERMISSIONS[permission];
-    
     if (!allowedRoles) {
-      logger.error(` Permission '${permission}' not defined in PERMISSIONS object`);
       return sendError(res, 500, 'Permission configuration error');
     }
-
     if (!allowedRoles.includes(req.user.role)) {
-      logger.debug(` Permission denied. User role: ${req.user.role}, Required permission: ${permission}`);
       return sendError(res, 403, `Access denied. Missing permission: ${permission}`);
     }
-
-    logger.info(`✅ Permission check passed: ${permission} for ${req.user.role}`);
     next();
   };
 };
@@ -144,31 +126,15 @@ export const requirePermission = (permission) => {
 export const requireOwnership = (Model, paramName = 'id', ownerField = 'userId') => {
   return async (req, res, next) => {
     try {
-      if (req.user.role === 'admin') {
-        logger.info(' Admin user - ownership check bypassed');
-        return next();
-      }
-
-      const resourceId = req.params[paramName];
-      const resource = await Model.findById(resourceId);
-
-      if (!resource) {
-        return sendError(res, 404, 'Resource not found');
-      }
-
-      const ownerId = resource[ownerField]?.toString();
-      const userId = req.userId.toString();
-
-      if (ownerId !== userId) {
-        logger.debug(` Ownership check failed. Resource owner: ${ownerId}, User: ${userId}`);
+      if (req.user.role === 'admin') return next();
+      const resource = await Model.findById(req.params[paramName]);
+      if (!resource) return sendError(res, 404, 'Resource not found');
+      if (resource[ownerField]?.toString() !== req.userId.toString()) {
         return sendError(res, 403, 'Access denied. You do not own this resource');
       }
-
-      logger.info(' Ownership verified');
       req.resource = resource;
       next();
     } catch (error) {
-      logger.error('Ownership check error:', error.message);
       return sendError(res, 500, 'Error checking resource ownership');
     }
   };
@@ -177,68 +143,45 @@ export const requireOwnership = (Model, paramName = 'id', ownerField = 'userId')
 export const requirePharmacyOwnership = (Model, paramName = 'id') => {
   return async (req, res, next) => {
     try {
-      if (req.user.role === 'admin') {
-        logger.info(' Admin user - pharmacy ownership check bypassed');
-        return next();
-      }
-
+      if (req.user.role === 'admin') return next();
       if (req.user.role !== 'pharmacy') {
         return sendError(res, 403, 'Access denied. Pharmacy role required');
       }
-
-      const resourceId = req.params[paramName];
-      const resource = await Model.findById(resourceId);
-
-      if (!resource) {
-        return sendError(res, 404, 'Resource not found');
-      }
-
+      const resource = await Model.findById(req.params[paramName]);
+      if (!resource) return sendError(res, 404, 'Resource not found');
       const pharmacyId = req.user.pharmacyId?.toString();
-      const resourcePharmacyId = resource.pharmacyId?.toString();
-
-      if (!pharmacyId) {
-        return sendError(res, 403, 'Access denied. No pharmacy associated with this account');
-      }
-
-      if (pharmacyId !== resourcePharmacyId) {
-        logger.debug(` Pharmacy ownership check failed. Resource pharmacy: ${resourcePharmacyId}, User pharmacy: ${pharmacyId}`);
+      if (!pharmacyId) return sendError(res, 403, 'No pharmacy associated with this account');
+      if (pharmacyId !== resource.pharmacyId?.toString()) {
         return sendError(res, 403, 'Access denied. This resource belongs to another pharmacy');
       }
-
-      logger.info(' Pharmacy ownership verified');
       req.resource = resource;
       next();
     } catch (error) {
-      logger.error('Pharmacy ownership check error:', error.message);
       return sendError(res, 500, 'Error checking pharmacy ownership');
     }
   };
 };
 
-// Optional auth — never blocks, just tries to identify the user
+// Optional auth — never blocks, silently attaches user if valid token
 export const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       const decoded = verifyAccessToken(token);
-
       if (decoded) {
         const user = await User.findById(decoded.userId);
         if (user && user.isActive) {
           if (user.role === 'pharmacy' && user.pharmacyId) {
             const pharmacy = await Pharmacy.findById(user.pharmacyId).select('isPermanentClose status');
-            // Skip attaching pharmacy user if permanently disabled — but don't block
+            // Only skip attaching if permanently disabled — rejected still gets attached
             if (pharmacy && (pharmacy.isPermanentClose === true || pharmacy.status === 'disabled')) {
               return next();
             }
           }
-
           req.user = user;
           req.userId = decoded.userId;
           req.userRole = decoded.role;
-          logger.info(' Optional auth - user identified:', decoded.userId);
         }
       }
     }

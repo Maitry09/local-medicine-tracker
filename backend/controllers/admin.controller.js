@@ -234,10 +234,11 @@ export const updatePharmacyAdmin = asyncHandler(async (req, res) => {
   }
   if (typeof tempCloseUntil !== 'undefined') update.tempCloseUntil = tempCloseUntil;
 
-  // Handle rejection reason — do NOT deactivate user, just mark pharmacy rejected
+  // REJECTION: only hide from listings, do NOT deactivate user account
+  // Rejected pharmacy owners can still login, see reason, update profile, resubmit
   if (status === 'rejected') {
     update.status = 'rejected';
-    update.isActive = false; // hide from listings only
+    update.isActive = false;
     if (rejectionReason) update.rejectionReason = rejectionReason;
   } else if (status === 'approved') {
     update.status = 'approved';
@@ -249,30 +250,25 @@ export const updatePharmacyAdmin = asyncHandler(async (req, res) => {
   const pharmacy = await Pharmacy.findByIdAndUpdate(
     req.params.id,
     update,
-    { new: true, runValidators: true }
+    { new: true, runValidators: false }
   ).populate('owner', 'name email phone');
 
   if (!pharmacy) {
     return sendError(res, 404, 'Pharmacy not found');
   }
 
-  // Additionally, if status was set to 'disabled' via isPermanentClose, deactivate owner
-  if (update.status === 'disabled' && update.isPermanentClose === true) {
-    const ownerId = pharmacy.owner?._id || pharmacy.owner;
-    if (ownerId) {
-      await User.findByIdAndUpdate(ownerId, { isActive: false, refreshToken: null });
-    }
-  }
+  const ownerId = pharmacy.owner?._id || pharmacy.owner;
 
-  // If reopening from permanent close, reactivate owner too
-  if (update.isPermanentClose === false) {
-    const ownerId = pharmacy.owner?._id || pharmacy.owner;
-    if (ownerId) {
+  try {
+    // ONLY touch user account for permanent close/reopen — never for rejection
+    if (isPermanentClose === true && ownerId) {
+      await User.findByIdAndUpdate(ownerId, { isActive: false, refreshToken: null });
+    } else if (isPermanentClose === false && ownerId) {
       await User.findByIdAndUpdate(ownerId, { isActive: true });
     }
+  } catch (err) {
+    console.error('Failed to update owner status:', err);
   }
-
-  // NEVER deactivate owner for rejection — rejected pharmacy owners can still login
 
   // Notify owner if rejection or approval
   if (status === 'rejected' && rejectionReason && pharmacy.owner) {

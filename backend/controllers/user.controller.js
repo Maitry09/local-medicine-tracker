@@ -96,7 +96,7 @@ export const enableUser = asyncHandler(async (req, res) => {
     return sendError(res, 404, 'User not found');
   }
 
-  // If this is a pharmacy owner, also reactivate the pharmacy (only if permanently closed, not rejected)
+  // If this is a pharmacy owner, also reactivate the pharmacy if it was permanently disabled
   if (user.role === 'pharmacy' && user.pharmacyId) {
     const pharmacy = await Pharmacy.findById(user.pharmacyId);
     if (pharmacy && pharmacy.status === 'disabled') {
@@ -106,6 +106,8 @@ export const enableUser = asyncHandler(async (req, res) => {
         status: 'approved'
       });
     }
+    // Note: rejected pharmacies are NOT touched here — their status stays rejected
+    // so admin must separately approve them after the owner resubmits
   }
 
   sendSuccess(res, 200, { user }, 'User enabled successfully');
